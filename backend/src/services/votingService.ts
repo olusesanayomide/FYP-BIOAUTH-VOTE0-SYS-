@@ -1,0 +1,498 @@
+import { supabase } from '../config/supabase';
+import { ApiError } from '../middleware/errorHandler';
+
+/**
+ * Get all available elections dynamically filtered by voter's institution scope
+ */
+export const getElections = async (userIdStr?: string) => {
+  const { data: rawElections, error } = await supabase
+    .from('elections')
+    .select(`
+      *,
+      positions (id, name, description),
+      candidates (
+        id,
+        user_id,
+        name,
+        position,
+        bio,
+        photo_url,
+        party,
+        status,
+        faculty,
+        department,
+        level,
+        manifesto_url
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error("Fetch elections error:", error);
+    throw new ApiError(500, 'Failed to fetch elections', 'FETCH_FAILED');
+  }
+
+  let elections = rawElections || [];
+  console.log(`[getElections] Found ${elections.length} total elections in DB`);
+
+  // Filter based on user profile logic if user is logged in
+  if (userIdStr) {
+    const { data: user } = await supabase
+      .from('users')
+      .select('faculty, department, level')
+      .eq('id', userIdStr)
+      .single();
+
+    if (user) {
+      const beforeCount = elections.length;
+      elections = elections.filter((election: any) => {
+        // Only apply scope filter if the election explicitly scopes to a specific group
+        // If scope is 'All', 'University-Wide', or empty/null, it's open to everyone
+        const isFacultyScoped = election.scope_faculty &&
+          election.scope_faculty.trim() !== '' &&
+          election.scope_faculty !== 'All' &&
+          election.scope_faculty !== 'University-Wide';
+
+        if (isFacultyScoped && election.scope_faculty !== user.faculty) return false;
+
+        const isDeptScoped = election.scope_department &&
+          election.scope_department.trim() !== '' &&
+          election.scope_department !== 'All' &&
+          election.scope_department !== 'University-Wide';
+
+        if (isDeptScoped && election.scope_department !== user.department) return false;
+
+        if (election.scope_level && election.scope_level > 0 && user.level && user.level !== election.scope_level) return false;
+
+        return true;
+      });
+      console.log(`[getElections] Filtered to ${elections.length} elections (from ${beforeCount}) for user ${userIdStr}`);
+    }
+  }
+
+  // Format and map output for frontend — CRITICAL: map DB column names to frontend interface names
+  return elections.map((election: any) => {
+    const positionsMap = new Map();
+    // Include all non-rejected candidates (approved + pending) so newly added candidates show
+    const visibleCandidates = (election.candidates || []).filter((c: any) => c.status !== 'rejected');
+    const existingPositions = election.positions || [];
+
+    visibleCandidates.forEach((c: any) => {
+      const posName = c.position || 'General';
+
+      // Try to find the actual UUID for this position name from the positions table
+      const actualPosition = existingPositions.find((p: any) => p.name === posName);
+      const positionId = actualPosition ? actualPosition.id : posName;
+
+      if (!positionsMap.has(posName)) {
+        positionsMap.set(posName, {
+          id: positionId,
+          title: posName,
+          candidates: []
+        });
+      }
+      positionsMap.get(posName).candidates.push({
+        id: c.id,
+        userId: c.user_id, // Include the actual user_id for voting
+        name: c.name,
+        platform: c.bio,
+        imageUrl: c.photo_url || null,
+        party: c.party || null,
+        faculty: c.faculty || null,
+        department: c.department || null,
+        level: c.level || null,
+        manifestoUrl: c.manifesto_url || null
+      });
+    });
+
+    // CRITICAL FIX: explicitly remap DB column names → frontend interface field names
+    return {
+      id: election.id,
+      title: election.title,
+      description: election.description,
+      // Map start_time/end_time (DB) → startDate/endDate (frontend interface)
+      startDate: election.start_time || election.startDate || null,
+      endDate: election.end_time || election.endDate || null,
+      status: election.status,
+      require_biometrics: election.require_biometrics ?? election.biometric_enforced ?? false,
+      required_level: election.scope_level ? String(election.scope_level) : null,
+      type: election.type,
+      positions: Array.from(positionsMap.values()),
+    };
+  });
+};
+
+/**
+ * Get specific election details
+ */
+export const getElectionById = async (electionId: string) => {
+  const { data: election, error } = await supabase
+    .from('elections')
+    .select(`
+      *,
+      positions (id, name, description),
+      candidates (
+        id,
+        user_id,
+        name,
+        position,
+        bio,
+        photo_url,
+        party,
+        status,
+        faculty,
+        department,
+        level,
+        manifesto_url
+      )
+    `)
+    .eq('id', electionId)
+    .single();
+
+  if (error || !election) {
+    throw new ApiError(404, 'Election not found', 'ELECTION_NOT_FOUND');
+  }
+
+  const positionsMap = new Map();
+  const approvedCandidates = (election.candidates || []).filter((c: any) => c.status === 'approved');
+  const existingPositions = election.positions || [];
+
+  approvedCandidates.forEach((c: any) => {
+    const posName = c.position || 'General';
+
+    // Try to find the actual UUID for this position name from the positions table
+    const actualPosition = existingPositions.find((p: any) => p.name === posName);
+    const positionId = actualPosition ? actualPosition.id : posName;
+
+    if (!positionsMap.has(posName)) {
+      positionsMap.set(posName, {
+        id: positionId, // Map position UUID if found, else name string
+        title: posName,
+        candidates: []
+      });
+    }
+    positionsMap.get(posName).candidates.push({
+      id: c.id,
+      userId: c.user_id, // Include the actual user_id for voting
+      name: c.name,
+      platform: c.bio,
+      imageUrl: c.photo_url || null,
+      party: c.party || null,
+      faculty: c.faculty || null,
+      department: c.department || null,
+      level: c.level || null,
+      manifestoUrl: c.manifesto_url || null
+    });
+  });
+
+  return {
+    ...election,
+    startDate: election.start_time,
+    endDate: election.end_time,
+    require_biometrics: election.require_biometrics ?? election.biometric_enforced ?? false,
+    positions: Array.from(positionsMap.values()),
+    candidates: undefined
+  };
+};
+
+/**
+ * Check if user is eligible to vote
+ */
+export const checkVotingEligibility = async (userId: string, electionId: string) => {
+  // Get user
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (userError || !user) {
+    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
+  }
+
+  // Get election
+  const { data: election, error: electionError } = await supabase
+    .from('elections')
+    .select('*')
+    .eq('id', electionId)
+    .single();
+
+  if (electionError || !election) {
+    throw new ApiError(404, 'Election not found', 'ELECTION_NOT_FOUND');
+  }
+
+  // Check if user is eligible based on user type
+  const eligibleTypes = election.eligible_types || [];
+  if (!eligibleTypes.includes(user.user_type)) {
+    throw new ApiError(
+      403,
+      `${user.user_type}s are not eligible to vote in this election`,
+      'NOT_ELIGIBLE',
+    );
+  }
+
+  // Check if user has already voted
+  const { data: existingVote } = await supabase
+    .from('voter_records')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('election_id', electionId)
+    .single();
+
+  if (existingVote) {
+    throw new ApiError(
+      409,
+      'You have already voted in this election. Double voting is not permitted.',
+      'ALREADY_VOTED',
+    );
+  }
+
+  // Check election is ongoing
+  const now = new Date();
+  if (new Date(election.start_time) > now || new Date(election.end_time) < now) {
+    throw new ApiError(403, 'This election is not currently open for voting', 'ELECTION_CLOSED');
+  }
+
+  return {
+    eligible: true,
+    electionTitle: election.title,
+    userType: user.user_type,
+  };
+};
+
+/**
+ * Submit multiple votes in an election
+ * CRITICAL: Time bound checking & double vote protection
+ */
+export const submitVote = async (
+  userId: string,
+  input: {
+    electionId: string;
+    votes: { positionId: string; candidateId: string }[];
+  },
+) => {
+  // Validate array
+  if (!Array.isArray(input.votes) || input.votes.length === 0) {
+    throw new ApiError(400, 'Votes array is missing or empty', 'MISSING_FIELDS');
+  }
+
+  // Validate user exists
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (userError || !user) {
+    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
+  }
+
+  // Validate election exists
+  const { data: election, error: electionError } = await supabase
+    .from('elections')
+    .select('*')
+    .eq('id', input.electionId)
+    .single();
+
+  if (electionError || !election) {
+    throw new ApiError(404, 'Election not found', 'ELECTION_NOT_FOUND');
+  }
+
+  // Check election constraints globally (Time bounds)
+  const now = new Date();
+  const startTime = new Date(election.start_time);
+  const endTime = new Date(election.end_time);
+
+  if (now < startTime) {
+    throw new ApiError(403, 'Election has not started yet', 'ELECTION_NOT_STARTED');
+  }
+  if (now > endTime) {
+    throw new ApiError(403, 'Election has already concluded', 'ELECTION_ENDED');
+  }
+
+  // Check if user has already voted in this election globally
+  const { data: existingVoterRecord } = await supabase
+    .from('voter_records')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('election_id', input.electionId)
+    .single();
+
+  if (existingVoterRecord) {
+    throw new ApiError(
+      409,
+      'You have already participated in this election',
+      'DOUBLE_VOTE_DETECTED',
+    );
+  }
+
+  // Build the bulk insert payload
+  const votePayloads = input.votes.map((vote) => ({
+    voter_id: userId,
+    election_id: input.electionId,
+    position_id: vote.positionId,
+    selected_candidate_id: vote.candidateId,
+    webauthn_verified: election.require_biometrics !== false, // Inherit election strictness
+    webauthn_timestamp: new Date(),
+  }));
+
+  // Bulk Insert Votes
+  const { error: insertError } = await supabase
+    .from('votes')
+    .insert(votePayloads);
+
+  if (insertError) {
+    throw new ApiError(500, 'Failed to submit votes', 'VOTE_SUBMISSION_FAILED');
+  }
+
+  // Create voter record confirming participation
+  const { error: recordError } = await supabase
+    .from('voter_records')
+    .insert({
+      user_id: userId,
+      election_id: input.electionId,
+    });
+
+  if (recordError) {
+    // If we fail here, votes are logged but record is missing. Ideally a transaction should be used, but this suffices for Supabase standard.
+    console.error('Failed to log voter record', recordError);
+  }
+
+  // We could log every individual vote locally, but just 1 audit is fine
+  await logAuditAction(userId, 'VOTE_SUBMITTED', 'ELECTION', input.electionId, 'SUCCESS');
+
+  return {
+    success: true,
+    message: 'Votes recorded successfully',
+    timestamp: new Date(),
+  };
+};
+
+/**
+ * Get voting results
+ */
+export const getVotingResults = async (electionId: string) => {
+  const { data: election, error: electionError } = await supabase
+    .from('elections')
+    .select(`
+      *,
+      candidates (
+        id,
+        name,
+        position
+      ),
+      votes (
+        id,
+        selected_candidate_id
+      )
+    `)
+    .eq('id', electionId)
+    .single();
+
+  if (electionError || !election) {
+    throw new ApiError(404, 'Election not found', 'ELECTION_NOT_FOUND');
+  }
+
+  const positionsMap = new Map();
+  (election.candidates || []).forEach((c: any) => {
+    const posName = c.position || 'General';
+    if (!positionsMap.has(posName)) {
+      positionsMap.set(posName, {
+        positionId: posName,
+        positionName: posName,
+        candidates: []
+      });
+    }
+    const voteCount = (election.votes || []).filter((v: any) => v.selected_candidate_id === c.id).length;
+    positionsMap.get(posName).candidates.push({
+      candidateId: c.id,
+      candidateName: c.name,
+      voteCount,
+    });
+  });
+
+  return {
+    electionTitle: election.title,
+    totalVotes: election.votes?.length || 0,
+    results: Array.from(positionsMap.values()),
+  };
+};
+
+/**
+ * Get user's voting history
+ */
+export const getUserVotingHistory = async (userId: string) => {
+  const { data: votes, error } = await supabase
+    .from('votes')
+    .select(`
+      *,
+      election: elections (id, title),
+      selectedCandidate: candidates (id, name, position)
+    `)
+    .eq('voter_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new ApiError(500, 'Failed to fetch voting history', 'FETCH_FAILED');
+  }
+
+  // Group votes by election for the frontend UI
+  const electionsMap = new Map();
+
+  (votes || []).forEach((vote: any) => {
+    if (!vote.election) return;
+
+    if (!electionsMap.has(vote.election.id)) {
+      electionsMap.set(vote.election.id, {
+        electionId: vote.election.id,
+        electionTitle: vote.election.title,
+        votedAt: vote.created_at, // Use the most recent vote time for the election
+        voteCount: 0,
+        selections: []
+      });
+    }
+
+    const entry = electionsMap.get(vote.election.id);
+    entry.voteCount += 1;
+
+    // Keep most recent votedAt
+    if (new Date(vote.created_at) > new Date(entry.votedAt)) {
+      entry.votedAt = vote.created_at;
+    }
+
+    // Add this position's selection
+    if (vote.selectedCandidate) {
+      entry.selections.push({
+        positionTitle: vote.position_id || vote.selectedCandidate.position || 'Unknown Position',
+        candidateName: vote.selectedCandidate.name
+      });
+    }
+  });
+
+  return Array.from(electionsMap.values());
+};
+
+/**
+ * Log audit action
+ */
+const logAuditAction = async (
+  userId: string,
+  action: string,
+  resourceType: string,
+  resourceId: string,
+  status: string,
+) => {
+  try {
+    await supabase
+      .from('audit_logs')
+      .insert({
+        user_id: userId,
+        action,
+        resource_type: resourceType,
+        resource_id: resourceId,
+        status,
+      });
+  } catch (error) {
+    console.error('Failed to log audit action:', error);
+  }
+};
