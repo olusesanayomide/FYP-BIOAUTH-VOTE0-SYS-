@@ -309,7 +309,7 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
                             return (
                               <button
                                 key={cand.id}
-                                onClick={() => handleSelectCandidate(pos.id, cand.userId || cand.id)}
+                                onClick={() => handleSelectCandidate(pos.id, cand.id)}
                                 className={`group relative flex flex-col gap-4 rounded-2xl border p-5 transition-all duration-200 text-left ${isSelected
                                   ? "border-[#8b5cf6] bg-[#8b5cf6]/10 shadow-[0_0_20px_rgba(139,92,246,0.15)]"
                                   : "border-border/40 bg-card hover:border-[#8b5cf6]/50 hover:bg-[#8b5cf6]/5"

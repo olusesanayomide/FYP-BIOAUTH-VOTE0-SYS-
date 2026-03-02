@@ -254,14 +254,24 @@ export const getAllCandidates = async () => {
     try {
         const { data, error } = await supabase
             .from('candidates')
-            .select('*')
+            .select(`
+                *,
+                elections:election_id (
+                    title
+                )
+            `)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
+        const normalized = (data || []).map((cand: any) => ({
+            ...cand,
+            election_name: cand?.elections?.title || 'Unknown Election'
+        }));
+
         return {
             success: true,
-            data
+            data: normalized
         };
     } catch (error: any) {
         console.error('Error fetching candidates:', error);
@@ -282,9 +292,36 @@ export const getAllVoters = async () => {
 
         if (error) throw error;
 
+        const voterIds = (data || []).map((u: any) => u.id);
+        let voteRows: any[] = [];
+
+        if (voterIds.length > 0) {
+            const { data: votesData, error: votesError } = await supabase
+                .from('votes')
+                .select('voter_id, created_at')
+                .in('voter_id', voterIds);
+
+            if (votesError) throw votesError;
+            voteRows = votesData || [];
+        }
+
+        const lastVotedAtByUser = new Map<string, string>();
+        for (const row of voteRows) {
+            const existing = lastVotedAtByUser.get(row.voter_id);
+            if (!existing || new Date(row.created_at) > new Date(existing)) {
+                lastVotedAtByUser.set(row.voter_id, row.created_at);
+            }
+        }
+
+        const enriched = (data || []).map((u: any) => ({
+            ...u,
+            has_voted: lastVotedAtByUser.has(u.id),
+            last_voted_at: lastVotedAtByUser.get(u.id) || null
+        }));
+
         return {
             success: true,
-            data
+            data: enriched
         };
     } catch (error: any) {
         console.error('Error fetching voters:', error);
@@ -383,7 +420,8 @@ export const deleteVoter = async (id: string, adminId: string) => {
 export const createCandidate = async (candidateData: any, adminId: string) => {
     try {
         const {
-            name, position, studentId, email, bio, electionId, status, party, photoUrl, manifestoUrl
+            name, position, studentId, email, bio, electionId, status, party, photoUrl, manifestoUrl,
+            faculty: manualFaculty, department: manualDepartment, level: manualLevel
         } = candidateData;
 
         if (!name || !position || !studentId || !electionId) {
@@ -406,9 +444,9 @@ export const createCandidate = async (candidateData: any, adminId: string) => {
             .eq('matric_no', studentId)
             .single();
 
-        const faculty = studentInfo?.faculty || 'Unknown';
-        const department = studentInfo?.department || 'Unknown';
-        const level = studentInfo?.level || 'Unknown';
+        const faculty = studentInfo?.faculty || manualFaculty || 'Unknown';
+        const department = studentInfo?.department || manualDepartment || 'Unknown';
+        const level = studentInfo?.level || manualLevel || 'Unknown';
 
         const { data, error } = await supabase
             .from('candidates')
@@ -422,13 +460,17 @@ export const createCandidate = async (candidateData: any, adminId: string) => {
                 department,
                 level,
                 election_id: electionId,
-                election_name: electionName,
                 status: status || 'pending',
                 party: party || 'Independent',
                 photo_url: photoUrl,
                 manifesto_url: manifestoUrl
             }])
-            .select()
+            .select(`
+                *,
+                elections:election_id (
+                    title
+                )
+            `)
             .single();
 
         if (error) throw error;
@@ -443,15 +485,20 @@ export const createCandidate = async (candidateData: any, adminId: string) => {
             details: JSON.stringify({
                 name: data.name,
                 position: data.position,
-                election_name: data.election_name,
-                description: `Added candidate ${data.name} to election ${data.election_name}`
+                election_name: electionName,
+                description: `Added candidate ${data.name} to election ${electionName}`
             })
         });
+
+        const responseData = {
+            ...data,
+            election_name: data?.elections?.title || electionName
+        };
 
         return {
             success: true,
             message: 'Candidate created successfully',
-            data
+            data: responseData
         };
     } catch (error: any) {
         console.error('Error creating candidate:', error);

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Fingerprint, Lock, Eye, EyeOff, Check, ScanFace, Mail, ArrowLeft, Loader2, ShieldCheck, Radio, Wifi } from "lucide-react";
+import { Shield, Fingerprint, Check, ScanFace, Mail, ArrowLeft, Loader2 } from "lucide-react";
 import { getWebAuthnAuthenticationOptions, verifyWebAuthnAuthentication, requestLoginOtp, verifyLoginOtp } from "@/services/authService";
 
 type Stage = "credentials" | "biometric" | "otp" | "success";
@@ -217,101 +217,34 @@ const Login = () => {
     setResetSent(true);
   };
 
-  const securityIndicators = [
-    { icon: Lock, label: "256-bit Encryption" },
-    { icon: ShieldCheck, label: "WebAuthn Certified" },
-    { icon: Radio, label: "Anti-Duplicate Protection" },
-    { icon: Wifi, label: "Real-Time Auth Logs" },
-  ];
-
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* LEFT – Brand Panel (Desktop) */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
-        {/* Background layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-secondary to-background" />
-        <div className="absolute inset-0 grid-pattern opacity-40" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[140px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[300px] rounded-full bg-accent/4 blur-[100px]" />
-
-        {/* Glowing line accents */}
-        <div className="absolute top-0 left-1/2 w-px h-full bg-gradient-to-b from-transparent via-primary/10 to-transparent" />
-        <div className="absolute top-1/2 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary/8 to-transparent" />
-
-        <div className="relative z-10 max-w-md px-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="flex items-center gap-3 mb-10"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-primary" />
-            </div>
-            <span className="text-lg font-semibold text-foreground tracking-tight">SecureVote</span>
-          </motion.div>
-
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl font-bold text-foreground leading-tight mb-4"
-          >
-            Biometrically Verified Access
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-muted-foreground leading-relaxed mb-12"
-          >
-            One identity. One vote. Fully encrypted.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.35 }}
-            className="space-y-4"
-          >
-            {securityIndicators.map((item, i) => (
-              <motion.div
-                key={item.label}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.4 + i * 0.08 }}
-                className="flex items-center gap-3"
-              >
-                <div className="w-8 h-8 rounded-lg bg-primary/8 border border-border/50 flex items-center justify-center">
-                  <item.icon className="w-3.5 h-3.5 text-primary/70" />
-                </div>
-                <span className="text-sm text-muted-foreground">{item.label}</span>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </div>
-
-      {/* RIGHT – Login Card */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 relative">
+    <div className="min-h-screen bg-background relative flex items-center justify-center px-6 py-12">
+      <div className="absolute inset-0 grid-pattern opacity-30" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-secondary/25 to-background" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] rounded-full bg-primary/5 blur-[140px]" />
+      <div className="absolute bottom-0 left-1/3 w-[300px] h-[300px] rounded-full bg-accent/5 blur-[120px]" />
+      <div className="w-full max-w-[460px] relative">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/3 blur-[160px]" />
         </div>
 
-        {/* Mobile logo */}
-        <div className="lg:hidden absolute top-6 left-6 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+          className="flex items-center justify-center gap-2.5 mb-6"
+        >
+          <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
             <Shield className="w-4 h-4 text-primary" />
           </div>
           <span className="text-sm font-semibold text-foreground">SecureVote</span>
-        </div>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="relative z-10 w-full max-w-[460px]"
+          className="relative z-10 w-full"
         >
           <div className="bg-card/50 backdrop-blur-2xl border border-border/40 rounded-2xl p-10 shadow-2xl shadow-background/50">
             <AnimatePresence mode="wait">

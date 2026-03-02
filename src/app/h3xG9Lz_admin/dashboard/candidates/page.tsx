@@ -14,9 +14,9 @@ interface Candidate {
   id: string;
   name: string;
   position: string;
-  party: string;
   faculty: string;
   department: string;
+  level: string;
   studentId: string;
   email: string;
   bio: string;
@@ -36,6 +36,24 @@ const statusCfg: Record<CandidateStatus, { label: string; color: string; bg: str
   rejected: { label: "Rejected", color: "text-destructive", bg: "bg-destructive/10", icon: XCircle },
 };
 
+const babcockFaculties = [
+  "Computing and Engineering Sciences",
+  "Basic Medical Sciences",
+  "Law",
+  "Education and Humanities",
+  "Management Sciences",
+  "Public and Allied Health",
+];
+
+const babcockDepartments: Record<string, string[]> = {
+  "Computing and Engineering Sciences": ["Software Engineering", "Computer Science", "Information Technology", "Computer Engineering"],
+  "Basic Medical Sciences": ["Anatomy", "Physiology", "Biochemistry"],
+  "Law": ["Law"],
+  "Education and Humanities": ["English", "History", "Education"],
+  "Management Sciences": ["Accounting", "Business Administration", "Economics"],
+  "Public and Allied Health": ["Public Health", "Nursing", "Medical Laboratory Science"],
+};
+
 const Candidates = () => {
   const [view, setView] = useState<ViewMode>("list");
   const [selected, setSelected] = useState<Candidate | null>(null);
@@ -48,7 +66,18 @@ const Candidates = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Form states
-  const [form, setForm] = useState({ name: "", position: "", studentId: "", email: "", bio: "", electionId: "", status: "pending" as CandidateStatus });
+  const [form, setForm] = useState({
+    name: "",
+    position: "",
+    studentId: "",
+    email: "",
+    bio: "",
+    faculty: "",
+    department: "",
+    level: "",
+    electionId: "",
+    status: "pending" as CandidateStatus
+  });
   const [photo, setPhoto] = useState<File | null>(null);
   const [manifesto, setManifesto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,9 +112,9 @@ const Candidates = () => {
           id: dbCand.id,
           name: dbCand.name,
           position: dbCand.position,
-          party: dbCand.party || "Independent",
           faculty: dbCand.faculty || "Unknown",
           department: dbCand.department || "Unknown",
+          level: dbCand.level ? String(dbCand.level) : "Unknown",
           studentId: dbCand.student_id,
           email: dbCand.email,
           bio: dbCand.bio || "",
@@ -115,11 +144,14 @@ const Candidates = () => {
 
       // Upload Photo if exists
       if (photo) {
+        if (!supabase) {
+          throw new Error("File upload is unavailable: Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+        }
         const fileExt = photo.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `candidates/${fileName}`;
 
-        const { error: uploadError, data } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('candidate_photos')
           .upload(filePath, photo);
 
@@ -134,11 +166,14 @@ const Candidates = () => {
 
       // Upload Manifesto if exists
       if (manifesto) {
+        if (!supabase) {
+          throw new Error("File upload is unavailable: Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+        }
         const fileExt = manifesto.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `manifestos/${fileName}`;
 
-        const { error: uploadError, data } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('candidate_manifestos')
           .upload(filePath, manifesto);
 
@@ -167,7 +202,18 @@ const Candidates = () => {
       }
 
       // Reset form and go to list
-      setForm({ name: "", position: "", studentId: "", email: "", bio: "", electionId: "", status: "pending" as CandidateStatus });
+      setForm({
+        name: "",
+        position: "",
+        studentId: "",
+        email: "",
+        bio: "",
+        faculty: "",
+        department: "",
+        level: "",
+        electionId: "",
+        status: "pending" as CandidateStatus
+      });
       setPhoto(null);
       setManifesto(null);
       fetchInitialData(); // Re-hydrate list
@@ -270,16 +316,16 @@ const Candidates = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/20">
-                      {["Candidate", "Position", "Party", "Faculty", "Election", "Status", "Actions"].map((h) => (
+                      {["Candidate", "Position", "Faculty", "Department", "Level", "Election", "Status", "Actions"].map((h) => (
                         <th key={h} className="text-left px-4 py-3 text-[10px] text-muted-foreground tracking-wider uppercase font-medium">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={7} className="text-center py-8 text-muted-foreground"><div className="w-6 h-6 rounded-full border-t-2 border-r-2 border-primary animate-spin mx-auto" /></td></tr>
+                      <tr><td colSpan={8} className="text-center py-8 text-muted-foreground"><div className="w-6 h-6 rounded-full border-t-2 border-r-2 border-primary animate-spin mx-auto" /></td></tr>
                     ) : filtered.length === 0 ? (
-                      <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No candidates match the current filters.</td></tr>
+                      <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">No candidates match the current filters.</td></tr>
                     ) : (
                       filtered.map((c, i) => {
                         const cfg = statusCfg[c.status];
@@ -295,8 +341,9 @@ const Candidates = () => {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">{c.position}</td>
-                            <td className="px-4 py-3 text-xs text-muted-foreground">{c.party}</td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">{c.faculty}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">{c.department}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">{c.level}</td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">{c.electionName.substring(0, 25)}...</td>
                             <td className="px-4 py-3">
                               <span className={`text-[10px] font-medium tracking-wider uppercase px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
@@ -372,6 +419,39 @@ const Candidates = () => {
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Biography</label>
                   <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} placeholder="Brief candidate biography..."
                     className="w-full px-4 py-3 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 transition-all duration-300 resize-none" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Faculty (optional)</label>
+                  <select value={form.faculty} onChange={(e) => {
+                    const faculty = e.target.value;
+                    setForm({
+                      ...form,
+                      faculty,
+                      department: faculty ? (babcockDepartments[faculty]?.[0] || "") : ""
+                    });
+                  }}
+                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300 appearance-none">
+                    <option value="">Select Faculty</option>
+                    {babcockFaculties.map((faculty) => (
+                      <option key={faculty} value={faculty}>{faculty}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Department (optional)</label>
+                  <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}
+                    disabled={!form.faculty}
+                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300 appearance-none disabled:opacity-50 disabled:cursor-not-allowed">
+                    <option value="">{form.faculty ? "Select Department" : "Select Faculty First"}</option>
+                    {(babcockDepartments[form.faculty] || []).map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Level (optional)</label>
+                  <input value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} placeholder="e.g. 300"
+                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 transition-all duration-300" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Assign to Election</label>
@@ -451,7 +531,7 @@ const Candidates = () => {
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-semibold text-primary">{selected.name.charAt(0)}</div>
                   <div>
                     <h3 className="text-foreground font-medium">{selected.name}</h3>
-                    <p className="text-xs text-muted-foreground">{selected.position} • {selected.party}</p>
+                    <p className="text-xs text-muted-foreground">{selected.position}</p>
                     <p className="text-xs text-muted-foreground">{selected.email}</p>
                   </div>
                 </div>
@@ -460,6 +540,7 @@ const Candidates = () => {
                     ["Student ID", selected.studentId],
                     ["Faculty", selected.faculty],
                     ["Department", selected.department],
+                    ["Level", selected.level],
                     ["Election", selected.electionName],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between">

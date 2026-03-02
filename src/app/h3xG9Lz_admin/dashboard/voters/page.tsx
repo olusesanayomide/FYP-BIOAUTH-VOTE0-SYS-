@@ -148,9 +148,9 @@ const Voters = () => {
           faculty: u.faculty || '—',
           department: u.department || '—',
           bioStatus: u.registration_completed ? 'verified' : 'not_enrolled',
-          voteStatus: 'not_voted', // Needs actual vote query later
+          voteStatus: u.has_voted ? 'voted' : 'not_voted',
           device: '—',
-          lastLogin: '—',
+          lastLogin: u.last_voted_at ? new Date(u.last_voted_at).toLocaleString() : '—',
           riskLevel: 'low',
           bioEnrolledAt: u.registration_completed ? new Date(u.created_at).toLocaleString() : '—',
           deviceHash: '—',

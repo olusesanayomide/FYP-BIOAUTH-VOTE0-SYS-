@@ -326,15 +326,79 @@ export const submitVote = async (
     );
   }
 
-  // Build the bulk insert payload
-  const votePayloads = input.votes.map((vote) => ({
-    voter_id: userId,
-    election_id: input.electionId,
-    position_id: vote.positionId,
-    selected_candidate_id: vote.candidateId,
-    webauthn_verified: election.require_biometrics !== false, // Inherit election strictness
-    webauthn_timestamp: new Date(),
-  }));
+  // Build a reliable position map and resolve incoming IDs/names
+  const { data: existingPositions, error: positionsError } = await supabase
+    .from('positions')
+    .select('id, name')
+    .eq('election_id', input.electionId);
+
+  if (positionsError) {
+    throw new ApiError(500, 'Failed to resolve election positions', 'POSITION_RESOLUTION_FAILED');
+  }
+
+  const positionById = new Map<string, { id: string; name: string }>();
+  const positionByName = new Map<string, { id: string; name: string }>();
+  (existingPositions || []).forEach((p: any) => {
+    positionById.set(p.id, p);
+    positionByName.set(String(p.name).trim().toLowerCase(), p);
+  });
+
+  const isUuid = (val: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+  const resolvePositionId = async (incoming: string) => {
+    if (!incoming) {
+      throw new ApiError(400, 'Invalid vote payload: missing positionId', 'INVALID_BALLOT');
+    }
+
+    // Direct UUID match
+    if (isUuid(incoming) && positionById.has(incoming)) {
+      return incoming;
+    }
+
+    // Name-based match
+    const byName = positionByName.get(incoming.trim().toLowerCase());
+    if (byName) {
+      return byName.id;
+    }
+
+    // If a name was supplied and no record exists, create the missing position row.
+    // This supports elections configured only through candidate.position strings.
+    if (!isUuid(incoming)) {
+      const { data: created, error: createPosError } = await supabase
+        .from('positions')
+        .insert({
+          election_id: input.electionId,
+          name: incoming.trim(),
+          description: null,
+        })
+        .select('id, name')
+        .single();
+
+      if (createPosError || !created) {
+        throw new ApiError(500, 'Failed to create missing position for vote', 'POSITION_CREATE_FAILED');
+      }
+
+      positionById.set(created.id, created as any);
+      positionByName.set(String(created.name).trim().toLowerCase(), created as any);
+      return created.id;
+    }
+
+    throw new ApiError(400, 'Invalid position selected for this election', 'INVALID_BALLOT');
+  };
+
+  const votePayloads: any[] = [];
+  for (const vote of input.votes) {
+    const resolvedPositionId = await resolvePositionId(vote.positionId);
+    votePayloads.push({
+      voter_id: userId,
+      election_id: input.electionId,
+      position_id: resolvedPositionId,
+      selected_candidate_id: vote.candidateId,
+      webauthn_verified: election.require_biometrics !== false,
+      webauthn_timestamp: new Date(),
+    });
+  }
 
   // Bulk Insert Votes
   const { error: insertError } = await supabase
@@ -342,6 +406,13 @@ export const submitVote = async (
     .insert(votePayloads);
 
   if (insertError) {
+    console.error('Vote insert failed:', insertError);
+    if (insertError.code === '23503') {
+      throw new ApiError(400, 'Invalid ballot selection. Candidate or position does not exist.', 'INVALID_BALLOT');
+    }
+    if (insertError.code === '23505') {
+      throw new ApiError(409, 'Duplicate vote detected for one or more positions.', 'DOUBLE_VOTE_DETECTED');
+    }
     throw new ApiError(500, 'Failed to submit votes', 'VOTE_SUBMISSION_FAILED');
   }
 

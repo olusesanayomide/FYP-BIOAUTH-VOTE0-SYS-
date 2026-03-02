@@ -16,18 +16,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
   Fingerprint,
-  Lock,
   Check,
   ScanFace,
   Mail,
   Loader2,
-  ShieldCheck,
-  User,
-  Hash,
   ChevronRight,
   ArrowLeft,
-  UserCheck,
-  Eye,
   AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -279,56 +273,24 @@ const Register = () => {
     }`;
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* LEFT – Brand Panel (Desktop) */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-secondary to-background" />
-        <div className="absolute inset-0 grid-pattern opacity-40" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[140px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[300px] rounded-full bg-accent/4 blur-[100px]" />
-
-        <div className="relative z-10 text-center space-y-8">
+    <div className="min-h-screen bg-background relative flex items-center justify-center px-6 py-12">
+      <div className="absolute inset-0 grid-pattern opacity-30" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-secondary/25 to-background" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] rounded-full bg-primary/5 blur-[140px]" />
+      <div className="absolute bottom-0 left-1/3 w-[300px] h-[300px] rounded-full bg-accent/5 blur-[120px]" />
+      <div className="w-full max-w-md space-y-8 relative z-10">
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 border border-primary/20"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45 }}
+            className="flex items-center justify-center gap-2.5"
           >
-            <Shield className="w-10 h-10 text-primary" />
+            <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-primary" />
+            </div>
+            <span className="text-sm font-semibold text-foreground">SecureVote</span>
           </motion.div>
 
-          <div className="space-y-4 max-w-md">
-            <h1 className="text-4xl font-bold text-foreground">Secure Voting</h1>
-            <p className="text-muted-foreground text-lg">
-              Your identity, your choice. Biometric verification ensures only
-              legitimate votes count.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 pt-8">
-            {[
-              { icon: Lock, label: "256-bit Encryption" },
-              { icon: Fingerprint, label: "Biometric Identity" },
-              { icon: ShieldCheck, label: "Institutional Verified" },
-              { icon: UserCheck, label: "One Vote Per Person" },
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="text-center space-y-2"
-              >
-                <item.icon className="w-6 h-6 text-primary/60 mx-auto" />
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT – Form Panel */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 bg-gradient-to-b from-background to-secondary/5">
-        <div className="w-full max-w-md space-y-8">
           {/* Header */}
           <div className="text-center space-y-2">
             <h2 className="text-3xl font-bold text-foreground">Create Account</h2>
@@ -740,7 +702,6 @@ const Register = () => {
             )}
           </AnimatePresence>
         </div>
-      </div>
     </div>
   );
 };
