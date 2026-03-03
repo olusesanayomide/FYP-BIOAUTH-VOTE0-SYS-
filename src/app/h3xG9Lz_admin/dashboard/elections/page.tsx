@@ -303,8 +303,7 @@ const Elections = () => {
               </div>
               <button
                 onClick={() => setView("create")}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-[1.02]"
-                style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(187, 80%, 40%))", color: "#0B0E14", boxShadow: "0 0 20px hsla(187,100%,50%,0.15)" }}
+                className="admin-btn-primary px-4 py-2.5 text-sm font-medium shadow-[0_8px_20px_-14px_hsl(var(--primary)/0.55)]"
               >
                 <Plus className="w-4 h-4" />
                 Create Election
@@ -317,7 +316,7 @@ const Elections = () => {
                 const cfg = statusConfig[s];
                 const count = elections.filter((e) => e.status === s).length;
                 return (
-                  <motion.div key={s} className={`glass-card rounded-xl p-4 border ${cfg.border}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                  <motion.div key={s} className={`admin-card rounded-xl p-4 border ${cfg.border}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                     <div className="flex items-center justify-between">
                       <span className={`text-2xl font-semibold ${cfg.color}`}>{count}</span>
                       <cfg.icon className={`w-4 h-4 ${cfg.color}`} />
@@ -334,13 +333,13 @@ const Elections = () => {
                 <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
               </div>
             ) : elections.length === 0 ? (
-              <div className="glass-card rounded-xl p-12 text-center border-dashed border-border/50">
+              <div className="admin-card rounded-xl p-12 text-center border-dashed border-border/50">
                 <Vote className="w-12 h-12 text-primary/20 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-foreground mb-2">No Elections Found</h3>
                 <p className="text-sm text-muted-foreground mb-6">You haven't created any elections yet.</p>
                 <button
                   onClick={() => setView("create")}
-                  className="px-6 py-2.5 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/20"
+                  className="admin-btn-primary px-6 py-2.5 text-sm font-medium"
                 >
                   Create Your First Election
                 </button>
@@ -350,7 +349,7 @@ const Elections = () => {
                 <div className="relative mb-6">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search elections by name, type, or date..."
-                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all" />
+                    className="admin-input h-12 pl-10 pr-4 rounded-xl text-sm" />
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   {elections.filter(e =>
@@ -364,7 +363,7 @@ const Elections = () => {
                     return (
                       <motion.div
                         key={el.id}
-                        className={`glass-card rounded-xl p-6 border ${cfg.border} transition-all duration-300 cursor-pointer ${hoveredCard === el.id ? cfg.glow : ""}`}
+                        className={`admin-card rounded-xl p-6 border ${cfg.border} transition-all duration-300 cursor-pointer ${hoveredCard === el.id ? cfg.glow : ""}`}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.08 }}
@@ -437,7 +436,7 @@ const Elections = () => {
             <AnimatePresence>
               {showSuspendConfirm && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-background/60 backdrop-blur-sm">
-                  <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="glass-card rounded-2xl p-8 max-w-md w-full mx-4 border border-warning/20">
+                  <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="admin-card rounded-2xl p-8 max-w-md w-full mx-4 border border-warning/20">
                     <div className="flex items-center gap-3 mb-4">
                       <AlertTriangle className="w-5 h-5 text-warning" />
                       <h3 className="text-lg font-semibold text-foreground">Confirm Suspension</h3>
@@ -467,19 +466,19 @@ const Elections = () => {
               </button>
             </div>
 
-            <div className="glass-card rounded-2xl p-8 max-w-3xl">
+            <div className="admin-card rounded-2xl p-8 max-w-3xl">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Name */}
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Election Name</label>
                   <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Presidential Student Council 2026"
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:shadow-[0_0_15px_hsla(187,100%,50%,0.1)] transition-all duration-300" />
+                    className="admin-input h-12 px-4 text-sm placeholder:text-muted-foreground/60" />
                 </div>
                 {/* Description */}
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Description</label>
                   <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} placeholder="Brief description of this election..."
-                    className="w-full px-4 py-3 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:shadow-[0_0_15px_hsla(187,100%,50%,0.1)] transition-all duration-300 resize-none" />
+                    className="admin-input px-4 py-3 text-sm placeholder:text-muted-foreground/60 resize-none" />
                 </div>
                 {/* Type */}
                 <div className="space-y-2">
@@ -492,7 +491,7 @@ const Elections = () => {
                       scopeDepartment: e.target.value === "Departmental" ? (babcockDepartments[babcockFaculties[0]]?.[0] || "") : ""
                     })
                   }}
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300 appearance-none">
+                    className="admin-input h-12 px-4 text-sm appearance-none">
                     <option value="Presidential">Presidential</option>
                     <option value="Faculty">Faculty</option>
                     <option value="Departmental">Departmental</option>
@@ -510,7 +509,7 @@ const Elections = () => {
                         scopeDepartment: formData.type === "Departmental" ? (babcockDepartments[e.target.value]?.[0] || "") : ""
                       })
                     }}
-                      className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300 appearance-none">
+                      className="admin-input h-12 px-4 text-sm appearance-none">
                       {babcockFaculties.map(f => <option key={f} value={f}>{f}</option>)}
                     </select>
                   </div>
@@ -521,7 +520,7 @@ const Elections = () => {
                   <div className="space-y-2">
                     <label className="text-xs text-muted-foreground tracking-wide uppercase">Department Scope</label>
                     <select value={formData.scopeDepartment} onChange={(e) => setFormData({ ...formData, scopeDepartment: e.target.value })}
-                      className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300 appearance-none">
+                      className="admin-input h-12 px-4 text-sm appearance-none">
                       {(babcockDepartments[formData.scopeFaculty || babcockFaculties[0]] || []).map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
@@ -531,7 +530,7 @@ const Elections = () => {
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Student Level Scope</label>
                   <select value={formData.scopeLevel} onChange={(e) => setFormData({ ...formData, scopeLevel: e.target.value })}
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300 appearance-none">
+                    className="admin-input h-12 px-4 text-sm appearance-none">
                     <option value="">All Levels</option>
                     <option value="100">100 Level</option>
                     <option value="200">200 Level</option>
@@ -546,19 +545,19 @@ const Elections = () => {
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Start Date & Time</label>
                   <input type="datetime-local" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300" />
+                    className="admin-input h-12 px-4 text-sm" />
                 </div>
                 {/* End Date */}
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">End Date & Time</label>
                   <input type="datetime-local" value={formData.endDate} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300" />
+                    className="admin-input h-12 px-4 text-sm" />
                 </div>
                 {/* Voting Method */}
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Voting Method</label>
                   <select value={formData.votingMethod} onChange={(e) => setFormData({ ...formData, votingMethod: e.target.value })}
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300 appearance-none">
+                    className="admin-input h-12 px-4 text-sm appearance-none">
                     <option value="Single Choice">Single Choice</option>
                     <option value="Multiple Choice">Multiple Choice</option>
                   </select>
@@ -567,13 +566,13 @@ const Elections = () => {
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Max Votes Allowed</label>
                   <input type="number" min={1} value={formData.maxVotes} onChange={(e) => setFormData({ ...formData, maxVotes: Number(e.target.value) })}
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all duration-300" />
+                    className="admin-input h-12 px-4 text-sm" />
                 </div>
                 {/* Eligibility */}
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Voter Eligibility Rules</label>
                   <input value={formData.eligibilityRules} onChange={(e) => setFormData({ ...formData, eligibilityRules: e.target.value })} placeholder="e.g. Only 300 Level Students"
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 transition-all duration-300" />
+                    className="admin-input h-12 px-4 text-sm placeholder:text-muted-foreground/60" />
                 </div>
                 {/* Toggles */}
                 <div className="md:col-span-2 flex flex-wrap gap-6">
@@ -605,8 +604,7 @@ const Elections = () => {
             <div className="flex gap-3 mt-8 pt-6 border-t border-border/20">
               <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", votingMethod: "Single Choice", maxVotes: 1, biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
               <button onClick={handleCreateSubmit} disabled={isSubmitting}
-                className="px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
-                style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(187, 80%, 40%))", color: "#0B0E14", boxShadow: "0 0 20px hsla(187,100%,50%,0.15)" }}>
+                className="admin-btn-primary px-6 py-2.5 text-sm font-medium transition-all duration-300 hover:scale-[1.01] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
                 {isSubmitting ? "Saving..." : (editingId ? "Update Election" : "Create Election")}
               </button>
             </div>
@@ -641,7 +639,7 @@ const Elections = () => {
                 { label: "Votes Cast", value: selectedElection.votesCast.toLocaleString(), icon: BarChart3, color: "text-success" },
                 { label: "Fraud Alerts", value: selectedElection.fraudAlerts.toString(), icon: AlertTriangle, color: selectedElection.fraudAlerts > 0 ? "text-destructive" : "text-muted-foreground" },
               ].map((stat, i) => (
-                <motion.div key={i} className="glass-card rounded-xl p-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
+                <motion.div key={i} className="admin-card rounded-xl p-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
                   <stat.icon className={`w-4 h-4 ${stat.color} mb-3`} />
                   <p className={`text-xl font-semibold ${stat.color}`}>{stat.value}</p>
                   <p className="text-[10px] text-muted-foreground tracking-wider mt-1 uppercase">{stat.label}</p>
@@ -652,7 +650,7 @@ const Elections = () => {
             {/* Details grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Summary card */}
-              <div className="glass-card rounded-xl p-6">
+              <div className="admin-card rounded-xl p-6">
                 <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2"><Calendar className="w-4 h-4 text-primary" /> Election Details</h3>
                 <div className="space-y-3 text-sm">
                   {[
@@ -673,7 +671,7 @@ const Elections = () => {
               </div>
 
               {/* Security & integrity card */}
-              <div className="glass-card rounded-xl p-6">
+              <div className="admin-card rounded-xl p-6">
                 <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2"><Shield className="w-4 h-4 text-primary" /> Vote Integrity</h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
@@ -715,3 +713,4 @@ const Elections = () => {
 };
 
 export default Elections;
+

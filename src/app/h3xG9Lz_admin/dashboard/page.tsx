@@ -70,7 +70,7 @@ const Dashboard = () => {
     <DashboardLayout breadcrumb={["Dashboard"]}>
       {/* Hero */}
       <motion.div
-        className="glass-card rounded-2xl p-8 relative overflow-hidden"
+        className="admin-card rounded-2xl p-8 relative overflow-hidden"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
@@ -90,33 +90,33 @@ const Dashboard = () => {
             <p className="text-2xl font-semibold text-primary">
               {!isLoadingStats ? <AnimatedCounter target={stats.adminsOnline} duration={800} /> : "-"}
             </p>
-            <p className="text-[10px] text-muted-foreground tracking-wider mt-1">ADMINS ONLINE</p>
+            <p className="admin-kpi mt-1">ADMINS ONLINE</p>
           </div>
           <div className="w-px h-10 bg-border/30" />
           <div className="text-center">
             <p className="text-2xl font-semibold text-foreground">
               {!isLoadingStats ? <AnimatedCounter target={stats.totalVoters} /> : "-"}
             </p>
-            <p className="text-[10px] text-muted-foreground tracking-wider mt-1">TOTAL VOTERS</p>
+            <p className="admin-kpi mt-1">TOTAL VOTERS</p>
           </div>
           <div className="w-px h-10 bg-border/30" />
           <div className="text-center">
             <p className="text-2xl font-semibold text-success">
               {!isLoadingStats ? <AnimatedCounter target={stats.verifiedBio} /> : "-"}
             </p>
-            <p className="text-[10px] text-muted-foreground tracking-wider mt-1">VERIFIED BIO</p>
+            <p className="admin-kpi mt-1">VERIFIED BIO</p>
           </div>
         </div>
       </motion.div>
 
       {/* Election cards */}
       <div>
-        <h3 className="text-sm font-medium text-muted-foreground tracking-wider uppercase mb-4 mt-8">Election Status</h3>
+        <h3 className="admin-section-title mb-4 mt-8">Election Status</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {stats.elections?.length > 0 ? stats.elections.map((el, i) => (
             <motion.div
               key={i}
-              className={`glass-card rounded-xl p-6 cursor-pointer transition-all duration-300 border ${statusBorder(el.status)} ${hoveredCard === i ? statusGlow(el.status) : ""}`}
+              className={`admin-card rounded-xl p-6 cursor-pointer transition-all duration-300 border ${statusBorder(el.status)} ${hoveredCard === i ? statusGlow(el.status) : ""}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 + i * 0.1 }}
@@ -157,7 +157,7 @@ const Dashboard = () => {
       {/* Bottom grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Biometric module */}
-        <motion.div className="glass-card rounded-xl p-6 lg:col-span-1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
+        <motion.div className="admin-card rounded-xl p-6 lg:col-span-1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
           <div className="flex items-center gap-2 mb-4">
             <Fingerprint className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-medium text-foreground">Biometric Verification Stream</h3>
@@ -186,7 +186,7 @@ const Dashboard = () => {
         </motion.div>
 
         {/* Security center */}
-        <motion.div className="glass-card rounded-xl p-6 border border-destructive/5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
+        <motion.div className="admin-card rounded-xl p-6 border border-destructive/5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
           <div className="flex items-center gap-2 mb-4">
             <ShieldAlert className="w-4 h-4 text-destructive/70" />
             <h3 className="text-sm font-medium text-foreground">Security Center</h3>
@@ -212,7 +212,7 @@ const Dashboard = () => {
         </motion.div>
 
         {/* Recent actions */}
-        <motion.div className="glass-card rounded-xl p-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}>
+        <motion.div className="admin-card rounded-xl p-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}>
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-4 h-4 text-primary/60" />
             <h3 className="text-sm font-medium text-foreground">Recent Admin Actions</h3>
@@ -244,3 +244,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

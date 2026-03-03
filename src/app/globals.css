@@ -201,6 +201,51 @@
   .scan-line {
     animation: scanLine 2.5s ease-in-out infinite;
   }
+
+  /* Admin design system */
+  .admin-shell {
+    background:
+      radial-gradient(circle at 8% 10%, hsl(var(--primary) / 0.05), transparent 34%),
+      radial-gradient(circle at 92% 100%, hsl(var(--accent) / 0.06), transparent 36%),
+      hsl(var(--background));
+  }
+
+  .admin-card {
+    @apply rounded-xl border border-border/60 bg-card/85 backdrop-blur-xl shadow-[0_14px_34px_-24px_hsl(var(--foreground)/0.35)] transition-all duration-300;
+  }
+
+  .admin-card-soft {
+    @apply rounded-lg border border-border/50 bg-muted/30;
+  }
+
+  .admin-card:hover {
+    border-color: hsl(var(--primary) / 0.28);
+    box-shadow: 0 18px 42px -26px hsl(var(--primary) / 0.25);
+  }
+
+  .admin-input {
+    @apply w-full rounded-lg border border-border/70 bg-background/90 text-foreground placeholder:text-muted-foreground/60 transition-all duration-200;
+  }
+
+  .admin-input:focus {
+    @apply outline-none ring-2 ring-primary/20 border-primary/60;
+  }
+
+  .admin-kpi {
+    @apply text-[10px] uppercase tracking-[0.16em] text-muted-foreground;
+  }
+
+  .admin-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground border border-primary/40 hover:bg-primary/90 transition-all duration-200;
+  }
+
+  .admin-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border/70 bg-background/80 text-foreground hover:border-primary/35 hover:bg-muted/30 transition-all duration-200;
+  }
+
+  .admin-section-title {
+    @apply text-xs uppercase tracking-[0.16em] text-muted-foreground;
+  }
 }
 
 @keyframes float {

@@ -244,13 +244,12 @@ const Voters = () => {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={importLoading}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-muted/40 border border-border/50 text-foreground hover:bg-muted/60 transition-all duration-300 disabled:opacity-50"
+                  className="admin-btn-secondary px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                 >
                   <Upload className="w-4 h-4" /> Import Students
                 </button>
                 <button onClick={() => setView("enrollment")}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-[1.02]"
-                  style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(187, 80%, 40%))", color: "#0B0E14", boxShadow: "0 0 20px hsla(187,100%,50%,0.15)" }}>
+                  className="admin-btn-primary px-4 py-2.5 text-sm font-medium shadow-[0_8px_20px_-14px_hsl(var(--primary)/0.55)] transition-all duration-300 hover:scale-[1.01]">
                   <RefreshCw className="w-4 h-4" /> Enrollment
                 </button>
               </div>
@@ -264,7 +263,7 @@ const Voters = () => {
                 { label: "Have Voted", value: stats.voted, color: "text-success" },
                 { label: "Suspended", value: stats.suspended, color: "text-destructive" },
               ].map((s, i) => (
-                <motion.div key={i} className="glass-card rounded-xl p-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                <motion.div key={i} className="admin-card rounded-xl p-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                   <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
                   <p className="text-[10px] text-muted-foreground tracking-wider mt-1 uppercase">{s.label}</p>
                 </motion.div>
@@ -276,30 +275,30 @@ const Voters = () => {
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by name or matric number..."
-                  className="w-full h-10 pl-10 pr-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all" />
+                  className="admin-input h-10 pl-10 pr-4 text-xs" />
               </div>
               <select value={filterBio} onChange={(e) => setFilterBio(e.target.value)}
-                className="h-10 px-3 rounded-lg bg-muted/40 border border-border/50 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all appearance-none">
+                className="admin-input h-10 px-3 text-xs appearance-none">
                 <option value="all">All Bio Status</option>
                 <option value="verified">Verified</option>
                 <option value="not_enrolled">Not Enrolled</option>
                 <option value="flagged">Flagged</option>
               </select>
               <select value={filterVote} onChange={(e) => setFilterVote(e.target.value)}
-                className="h-10 px-3 rounded-lg bg-muted/40 border border-border/50 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all appearance-none">
+                className="admin-input h-10 px-3 text-xs appearance-none">
                 <option value="all">All Vote Status</option>
                 <option value="voted">Voted</option>
                 <option value="not_voted">Not Voted</option>
               </select>
               <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}
-                className="h-10 px-3 rounded-lg bg-muted/40 border border-border/50 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all appearance-none">
+                className="admin-input h-10 px-3 text-xs appearance-none">
                 <option value="all">All Departments</option>
                 {departments.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
 
             {/* Table */}
-            <div className="glass-card rounded-xl overflow-hidden">
+            <div className="admin-card rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -370,7 +369,7 @@ const Voters = () => {
             </div>
 
             {/* Critical notice */}
-            <div className="mt-6 glass-card rounded-xl p-4 border border-warning/10">
+            <div className="mt-6 admin-card rounded-xl p-4 border border-warning/10">
               <p className="text-[10px] text-warning/70 flex items-center gap-2">
                 <Shield className="w-3.5 h-3.5 flex-shrink-0" />
                 Admin can only see whether a voter has voted — never how they voted. Vote secrecy is cryptographically enforced.
@@ -392,7 +391,7 @@ const Voters = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* CSV Import */}
-              <div className="glass-card rounded-xl p-6">
+              <div className="admin-card rounded-xl p-6">
                 <h3 className="text-sm font-medium text-foreground mb-4">Import CSV File</h3>
                 <div className="h-40 rounded-lg border-2 border-dashed border-border/30 flex items-center justify-center cursor-pointer hover:border-primary/30 transition-colors">
                   <div className="text-center">
@@ -405,7 +404,7 @@ const Voters = () => {
               </div>
 
               {/* Bulk Actions */}
-              <div className="glass-card rounded-xl p-6">
+              <div className="admin-card rounded-xl p-6">
                 <h3 className="text-sm font-medium text-foreground mb-4">Bulk Actions</h3>
                 <div className="space-y-3">
                   <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/30 border border-border/30 text-sm text-foreground hover:bg-muted/50 hover:border-primary/20 transition-all">
@@ -436,7 +435,7 @@ const Voters = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               {/* Voter Info */}
-              <div className="glass-card rounded-xl p-6">
+              <div className="admin-card rounded-xl p-6">
                 <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2"><UserCheck className="w-4 h-4 text-primary" /> Voter Info</h3>
                 <div className="space-y-3 text-sm">
                   {[
@@ -458,7 +457,7 @@ const Voters = () => {
               </div>
 
               {/* Device & Login */}
-              <div className="glass-card rounded-xl p-6">
+              <div className="admin-card rounded-xl p-6">
                 <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2"><Smartphone className="w-4 h-4 text-primary" /> Device & Login</h3>
                 <div className="space-y-3 text-sm mb-4">
                   <div className="flex justify-between">
@@ -489,7 +488,7 @@ const Voters = () => {
 
               {/* Actions & Risk */}
               <div className="space-y-5">
-                <div className={`glass-card rounded-xl p-6 ${selected.suspiciousActivity.length > 0 ? "border border-destructive/10" : ""}`}>
+                <div className={`admin-card rounded-xl p-6 ${selected.suspiciousActivity.length > 0 ? "border border-destructive/10" : ""}`}>
                   <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2"><AlertTriangle className={`w-4 h-4 ${selected.suspiciousActivity.length > 0 ? "text-destructive" : "text-muted-foreground"}`} /> Account Health</h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -512,7 +511,7 @@ const Voters = () => {
                   </div>
                 </div>
 
-                <div className="glass-card rounded-xl p-6">
+                <div className="admin-card rounded-xl p-6">
                   <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2"><Shield className="w-4 h-4 text-primary" /> Management Actions</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {selected.status === "ACTIVE" ? (
@@ -541,7 +540,7 @@ const Voters = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="glass-card max-w-md w-full p-6 border border-primary/20"
+            className="admin-card max-w-md w-full p-6 border border-primary/20"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -630,3 +629,4 @@ const Voters = () => {
 };
 
 export default Voters;
+

@@ -264,9 +264,63 @@ export const getAllCandidates = async () => {
 
         if (error) throw error;
 
+        const candidateIds = (data || []).map((cand: any) => cand.id);
+        let approvalHistoryByCandidate = new Map<string, any[]>();
+
+        if (candidateIds.length > 0) {
+            const { data: auditRows, error: auditError } = await supabase
+                .from('audit_logs')
+                .select(`
+                    resource_id,
+                    action,
+                    created_at,
+                    details,
+                    admin:admin_id (username)
+                `)
+                .eq('resource_type', 'CANDIDATE')
+                .in('resource_id', candidateIds)
+                .in('action', ['CANDIDATE_CREATED', 'CANDIDATE_STATUS_UPDATED'])
+                .order('created_at', { ascending: false });
+
+            if (auditError) throw auditError;
+
+            for (const log of (auditRows || [])) {
+                const candidateId = (log as any).resource_id;
+                const existing = approvalHistoryByCandidate.get(candidateId) || [];
+
+                let details: any = {};
+                try {
+                    details = (log as any).details ? JSON.parse((log as any).details) : {};
+                } catch {
+                    details = {};
+                }
+
+                let actionLabel = 'Updated';
+                if ((log as any).action === 'CANDIDATE_CREATED') {
+                    actionLabel = 'Created';
+                } else if ((log as any).action === 'CANDIDATE_STATUS_UPDATED') {
+                    const status = String(details?.new_status || '').toLowerCase();
+                    if (status === 'approved') actionLabel = 'Approved';
+                    else if (status === 'rejected') actionLabel = 'Rejected';
+                    else if (status === 'pending') actionLabel = 'Set to Pending';
+                    else actionLabel = 'Status Updated';
+                }
+
+                existing.push({
+                    date: (log as any).created_at,
+                    action: actionLabel,
+                    admin: (log as any).admin?.username || 'System',
+                    note: details?.description || `${actionLabel} candidate`
+                });
+
+                approvalHistoryByCandidate.set(candidateId, existing);
+            }
+        }
+
         const normalized = (data || []).map((cand: any) => ({
             ...cand,
-            election_name: cand?.elections?.title || 'Unknown Election'
+            election_name: cand?.elections?.title || 'Unknown Election',
+            approval_history: approvalHistoryByCandidate.get(cand.id) || []
         }));
 
         return {

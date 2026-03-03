@@ -123,7 +123,12 @@ const Candidates = () => {
           electionName: dbCand.election_name,
           photoUrl: dbCand.photo_url || "",
           manifestoUrl: dbCand.manifesto_url || "",
-          approvalHistory: [] // Can be wired up later to audit_logs
+          approvalHistory: (dbCand.approval_history || []).map((h: any) => ({
+            date: h.date ? new Date(h.date).toLocaleString() : "Unknown date",
+            action: h.action || "Updated",
+            admin: h.admin || "System",
+            note: h.note || ""
+          }))
         })));
       }
     } catch (error) {
@@ -236,7 +241,38 @@ const Candidates = () => {
       if (!response.ok) throw new Error("Failed to update status");
 
       // Update local state without full refetch for crisp UI feel
-      setCandidates(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
+      setCandidates(prev => prev.map(c => {
+        if (c.id !== id) return c;
+        return {
+          ...c,
+          status: newStatus,
+          approvalHistory: [
+            {
+              date: new Date().toLocaleString(),
+              action: newStatus === "approved" ? "Approved" : newStatus === "rejected" ? "Rejected" : "Set to Pending",
+              admin: "You",
+              note: `Updated status of candidate ${c.name} to ${newStatus}`
+            },
+            ...c.approvalHistory
+          ]
+        };
+      }));
+      setSelected(prev => {
+        if (!prev || prev.id !== id) return prev;
+        return {
+          ...prev,
+          status: newStatus,
+          approvalHistory: [
+            {
+              date: new Date().toLocaleString(),
+              action: newStatus === "approved" ? "Approved" : newStatus === "rejected" ? "Rejected" : "Set to Pending",
+              admin: "You",
+              note: `Updated status of candidate ${prev.name} to ${newStatus}`
+            },
+            ...prev.approvalHistory
+          ]
+        };
+      });
     } catch (error) {
       console.error(error);
       alert("Failed to update candidate status");
@@ -570,6 +606,9 @@ const Candidates = () => {
                       </div>
                     </div>
                   ))}
+                  {selected.approvalHistory.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-2">No approval actions recorded yet.</p>
+                  )}
                 </div>
 
                 {selected.status === "pending" && (
