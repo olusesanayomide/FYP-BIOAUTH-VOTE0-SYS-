@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ParticleBackground } from "@/components/vote-core/particle-background"
 import { TopNav } from "@/components/vote-core/top-nav"
 import { Sidebar } from "@/components/vote-core/sidebar"
@@ -13,6 +13,24 @@ import { SettingsView } from "@/components/vote-core/settings-view"
 export default function VoterDashboard() {
   const [activeView, setActiveView] = useState("dashboard")
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    const savedView = localStorage.getItem("voter_active_view")
+    if (savedView && ["dashboard", "ballots", "verification", "history", "settings"].includes(savedView)) {
+      setActiveView(savedView)
+      localStorage.removeItem("voter_active_view")
+    }
+
+    const onSetActiveView = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail
+      if (detail && ["dashboard", "ballots", "verification", "history", "settings"].includes(detail)) {
+        setActiveView(detail)
+      }
+    }
+
+    window.addEventListener("voter:set-active-view", onSetActiveView)
+    return () => window.removeEventListener("voter:set-active-view", onSetActiveView)
+  }, [])
 
   const renderContent = () => {
     switch (activeView) {

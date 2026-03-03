@@ -120,7 +120,7 @@ export const getElections = async (): Promise<ApiResponse<Election[]>> => {
   } catch (error: any) {
     return {
       success: false,
-      error: error.response?.data?.error || 'Failed to fetch elections',
+      error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch elections',
     };
   }
 };

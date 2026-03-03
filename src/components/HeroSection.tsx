@@ -7,22 +7,22 @@ const HeroSection = () => {
   const headlineWords = "Secure. Transparent. Biometrically Verified Voting.".split(" ");
 
   return (
-    <section id="home" className="relative min-h-screen flex items-center overflow-hidden">
+    <section id="home" className="relative min-h-[88vh] flex items-center overflow-hidden">
       {/* Background grid */}
       <div className="absolute inset-0 grid-pattern" />
       {/* Gradient orbs */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/5 blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/4 w-[420px] h-[420px] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-[320px] h-[320px] rounded-full bg-accent/5 blur-[120px] pointer-events-none" />
 
-      <div className="relative z-10 max-w-7xl mx-auto w-full px-6 py-32 md:py-40">
-        <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+      <div className="relative z-10 max-w-7xl mx-auto w-full px-6 py-24 md:py-28">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left - Content */}
           <div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border/80 bg-card/40 backdrop-blur-sm mb-8"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border/80 bg-card/60 backdrop-blur-sm mb-6"
             >
               <Lock className="w-3.5 h-3.5 text-accent" />
               <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
@@ -30,7 +30,7 @@ const HeroSection = () => {
               </span>
             </motion.div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] mb-6">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.08] mb-5 max-w-[14ch]">
               {headlineWords.map((word, i) => (
                 <motion.span
                   key={i}
@@ -48,7 +48,7 @@ const HeroSection = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.7 }}
-              className="text-lg text-muted-foreground leading-relaxed max-w-lg mb-10"
+              className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl mb-8"
             >
               Next-generation biometric authentication ensures one person, one vote — fully encrypted and fraud-proof.
             </motion.p>
@@ -57,12 +57,12 @@ const HeroSection = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.9 }}
-              className="flex flex-wrap gap-4"
+              className="flex flex-wrap gap-3"
             >
-              <button className="gradient-cta text-primary-foreground font-semibold px-8 py-3.5 rounded-xl transition-all duration-300 hover:scale-[1.03] glow-cta text-sm">
+              <button className="gradient-cta text-primary-foreground font-semibold px-7 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm">
                 Verify & Vote Now
               </button>
-              <button className="border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/50 font-medium px-8 py-3.5 rounded-xl transition-all duration-300 text-sm">
+              <button className="border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/50 font-medium px-7 py-3 rounded-xl transition-all duration-300 text-sm">
                 Learn How It Works
               </button>
             </motion.div>

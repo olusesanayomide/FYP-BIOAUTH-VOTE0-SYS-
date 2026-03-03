@@ -12,7 +12,7 @@ const CTASection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-3xl md:text-5xl font-bold mb-4"
+          className="text-3xl md:text-5xl font-bold mb-3"
         >
           Ready to Conduct a Secure Election?
         </motion.h2>
@@ -21,7 +21,7 @@ const CTASection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.15 }}
-          className="text-lg text-muted-foreground mb-10"
+          className="text-base md:text-lg text-muted-foreground mb-8 max-w-2xl mx-auto"
         >
           Deploy in minutes. Scale to thousands.
         </motion.p>
@@ -31,7 +31,7 @@ const CTASection = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <button className="gradient-cta text-primary-foreground font-semibold px-10 py-4 rounded-xl transition-all duration-300 hover:scale-[1.03] glow-cta text-base">
+          <button className="gradient-cta text-primary-foreground font-semibold px-8 py-3.5 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm md:text-base">
             Start Secure Election
           </button>
         </motion.div>

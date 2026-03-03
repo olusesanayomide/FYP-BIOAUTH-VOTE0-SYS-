@@ -25,7 +25,7 @@ const LiveDemo = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="glass-card p-10 md:p-16 text-center relative overflow-hidden"
+          className="glass-card p-8 md:p-12 text-center relative overflow-hidden"
         >
           {/* Glow */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-primary/10 blur-[100px] rounded-full pointer-events-none" />
@@ -33,7 +33,7 @@ const LiveDemo = () => {
           <h2 className="text-3xl md:text-4xl font-bold mb-4 relative z-10">
             Experience the Future of Voting
           </h2>
-          <p className="text-muted-foreground mb-8 relative z-10">
+          <p className="text-muted-foreground mb-7 relative z-10 max-w-xl mx-auto">
             See how biometric verification works in real-time.
           </p>
           <button

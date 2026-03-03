@@ -7,11 +7,26 @@ import { ApiError } from '../middleware/errorHandler';
 export const getElections = async (userIdStr?: string) => {
   const { data: rawElections, error } = await supabase
     .from('elections')
-    .select(`
-      *,
-      positions (id, name, description),
-      candidates (
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error("Fetch elections error:", error);
+    throw new ApiError(500, 'Failed to fetch elections', 'FETCH_FAILED');
+  }
+
+  let elections = rawElections || [];
+  console.log(`[getElections] Found ${elections.length} total elections in DB`);
+
+  const electionIds = elections.map((e: any) => e.id);
+  let candidatesByElection = new Map<string, any[]>();
+
+  if (electionIds.length > 0) {
+    const { data: candidateRows, error: candidateError } = await supabase
+      .from('candidates')
+      .select(`
         id,
+        election_id,
         user_id,
         name,
         position,
@@ -23,17 +38,21 @@ export const getElections = async (userIdStr?: string) => {
         department,
         level,
         manifesto_url
-      )
-    `)
-    .order('created_at', { ascending: false });
+      `)
+      .in('election_id', electionIds);
 
-  if (error) {
-    console.error("Fetch elections error:", error);
-    throw new ApiError(500, 'Failed to fetch elections', 'FETCH_FAILED');
+    if (candidateError) {
+      console.error("Fetch candidates for elections error:", candidateError);
+      throw new ApiError(500, 'Failed to fetch elections', 'FETCH_FAILED');
+    }
+
+    for (const row of (candidateRows || [])) {
+      const key = (row as any).election_id;
+      const existing = candidatesByElection.get(key) || [];
+      existing.push(row);
+      candidatesByElection.set(key, existing);
+    }
   }
-
-  let elections = rawElections || [];
-  console.log(`[getElections] Found ${elections.length} total elections in DB`);
 
   // Filter based on user profile logic if user is logged in
   if (userIdStr) {
@@ -74,7 +93,7 @@ export const getElections = async (userIdStr?: string) => {
   return elections.map((election: any) => {
     const positionsMap = new Map();
     // Include all non-rejected candidates (approved + pending) so newly added candidates show
-    const visibleCandidates = (election.candidates || []).filter((c: any) => c.status !== 'rejected');
+    const visibleCandidates = (candidatesByElection.get(election.id) || []).filter((c: any) => c.status !== 'rejected');
     const existingPositions = election.positions || [];
 
     visibleCandidates.forEach((c: any) => {
@@ -128,24 +147,7 @@ export const getElections = async (userIdStr?: string) => {
 export const getElectionById = async (electionId: string) => {
   const { data: election, error } = await supabase
     .from('elections')
-    .select(`
-      *,
-      positions (id, name, description),
-      candidates (
-        id,
-        user_id,
-        name,
-        position,
-        bio,
-        photo_url,
-        party,
-        status,
-        faculty,
-        department,
-        level,
-        manifesto_url
-      )
-    `)
+    .select('*')
     .eq('id', electionId)
     .single();
 
@@ -153,8 +155,32 @@ export const getElectionById = async (electionId: string) => {
     throw new ApiError(404, 'Election not found', 'ELECTION_NOT_FOUND');
   }
 
+  const { data: candidateRows, error: candidateError } = await supabase
+    .from('candidates')
+    .select(`
+      id,
+      election_id,
+      user_id,
+      name,
+      position,
+      bio,
+      photo_url,
+      party,
+      status,
+      faculty,
+      department,
+      level,
+      manifesto_url
+    `)
+    .eq('election_id', electionId);
+
+  if (candidateError) {
+    console.error('Fetch candidates for election by id failed:', candidateError);
+    throw new ApiError(500, 'Failed to fetch election', 'FETCH_FAILED');
+  }
+
   const positionsMap = new Map();
-  const approvedCandidates = (election.candidates || []).filter((c: any) => c.status === 'approved');
+  const approvedCandidates = (candidateRows || []).filter((c: any) => c.status === 'approved');
   const existingPositions = election.positions || [];
 
   approvedCandidates.forEach((c: any) => {
@@ -190,8 +216,7 @@ export const getElectionById = async (electionId: string) => {
     startDate: election.start_time,
     endDate: election.end_time,
     require_biometrics: election.require_biometrics ?? election.biometric_enforced ?? false,
-    positions: Array.from(positionsMap.values()),
-    candidates: undefined
+    positions: Array.from(positionsMap.values())
   };
 };
 

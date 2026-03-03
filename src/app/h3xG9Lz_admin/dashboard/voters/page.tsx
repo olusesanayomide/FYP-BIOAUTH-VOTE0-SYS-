@@ -228,12 +228,16 @@ const Voters = () => {
         {/* LIST */}
         {view === "list" && (
           <motion.div key="list" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
+            <div className="admin-card rounded-xl p-5 md:p-6 mb-6">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
                 <UserCheck className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold text-foreground">Voter Registry</h2>
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground">Voter Registry</h2>
+                    <p className="text-sm text-foreground/70 dark:text-muted-foreground mt-1">Manage voter status, biometric enrollment, and election readiness.</p>
+                  </div>
               </div>
-              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -252,6 +256,7 @@ const Voters = () => {
                   className="admin-btn-primary px-4 py-2.5 text-sm font-medium shadow-[0_8px_20px_-14px_hsl(var(--primary)/0.55)] transition-all duration-300 hover:scale-[1.01]">
                   <RefreshCw className="w-4 h-4" /> Enrollment
                 </button>
+                </div>
               </div>
             </div>
 
@@ -265,7 +270,7 @@ const Voters = () => {
               ].map((s, i) => (
                 <motion.div key={i} className="admin-card rounded-xl p-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                   <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
-                  <p className="text-[10px] text-muted-foreground tracking-wider mt-1 uppercase">{s.label}</p>
+                  <p className="admin-kpi mt-1">{s.label}</p>
                 </motion.div>
               ))}
             </div>
@@ -298,13 +303,13 @@ const Voters = () => {
             </div>
 
             {/* Table */}
-            <div className="admin-card rounded-xl overflow-hidden">
+            <div className="admin-card rounded-xl overflow-hidden border-border/70">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border/20">
+                    <tr className="border-b border-border/30 bg-muted/35 dark:bg-muted/15">
                       {["Voter", "Faculty / Dept", "Biometric", "Vote Status", "Device", "Risk", "Actions"].map((h) => (
-                        <th key={h} className="text-left px-4 py-3 text-[10px] text-muted-foreground tracking-wider uppercase font-medium">{h}</th>
+                        <th key={h} className="text-left px-4 py-3 text-[11px] text-foreground/70 dark:text-muted-foreground tracking-wider uppercase font-medium">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -315,14 +320,14 @@ const Voters = () => {
                       <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No voters found.</td></tr>
                     ) : (
                       filtered.map((v, i) => (
-                        <motion.tr key={v.id} className="border-b border-border/10 hover:bg-muted/20 transition-colors" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                        <motion.tr key={v.id} className="border-b border-border/15 hover:bg-primary/5 dark:hover:bg-muted/20 transition-colors" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                           <td className="px-4 py-3">
                             <div>
                               <p className="text-foreground font-medium text-xs">{v.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{v.matricNo}</p>
+                              <p className="text-[10px] text-foreground/60 dark:text-muted-foreground">{v.matricNo}</p>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{v.faculty} / {v.department}</td>
+                          <td className="px-4 py-3 text-xs text-foreground/75 dark:text-muted-foreground">{v.faculty} / {v.department}</td>
                           <td className="px-4 py-3">
                             <span className={`text-[10px] font-medium tracking-wider uppercase px-2 py-0.5 rounded-full ${bioStatusCfg[v.bioStatus].bg} ${bioStatusCfg[v.bioStatus].color}`}>
                               {bioStatusCfg[v.bioStatus].label}
@@ -332,10 +337,10 @@ const Voters = () => {
                             {v.voteStatus === "voted" ? (
                               <span className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="w-3 h-3" /> Voted</span>
                             ) : (
-                              <span className="flex items-center gap-1 text-xs text-muted-foreground"><Clock className="w-3 h-3" /> Not Voted</span>
+                              <span className="flex items-center gap-1 text-xs text-foreground/65 dark:text-muted-foreground"><Clock className="w-3 h-3" /> Not Voted</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{v.device}</td>
+                          <td className="px-4 py-3 text-xs text-foreground/70 dark:text-muted-foreground">{v.device}</td>
                           <td className="px-4 py-3">
                             <span className={`text-[10px] font-medium tracking-wider uppercase px-2 py-0.5 rounded-full ${riskCfg[v.riskLevel].bg} ${riskCfg[v.riskLevel].color}`}>
                               {v.riskLevel}
@@ -343,19 +348,19 @@ const Voters = () => {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
-                              <button onClick={() => { setSelected(v); setView("profile"); }} className="p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all" title="View Profile">
+                              <button onClick={() => { setSelected(v); setView("profile"); }} className="p-1.5 rounded border border-transparent text-muted-foreground hover:text-primary hover:bg-primary/5 hover:border-primary/25 transition-all" title="View Profile">
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
                               {v.status === "ACTIVE" ? (
-                                <button onClick={() => handleStatusUpdate(v.id, "SUSPENDED")} className="p-1.5 rounded text-muted-foreground hover:text-warning hover:bg-warning/5 transition-all" title="Suspend Voter">
+                                <button onClick={() => handleStatusUpdate(v.id, "SUSPENDED")} className="p-1.5 rounded border border-transparent text-muted-foreground hover:text-warning hover:bg-warning/5 hover:border-warning/25 transition-all" title="Suspend Voter">
                                   <Pause className="w-3.5 h-3.5" />
                                 </button>
                               ) : (
-                                <button onClick={() => handleStatusUpdate(v.id, "ACTIVE")} className="p-1.5 rounded text-muted-foreground hover:text-success hover:bg-success/5 transition-all" title="Activate Voter">
+                                <button onClick={() => handleStatusUpdate(v.id, "ACTIVE")} className="p-1.5 rounded border border-transparent text-muted-foreground hover:text-success hover:bg-success/5 hover:border-success/25 transition-all" title="Activate Voter">
                                   <Play className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                              <button onClick={() => handleDelete(v.id, v.name)} className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all" title="Delete Voter">
+                              <button onClick={() => handleDelete(v.id, v.name)} className="p-1.5 rounded border border-transparent text-muted-foreground hover:text-destructive hover:bg-destructive/5 hover:border-destructive/25 transition-all" title="Delete Voter">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
@@ -629,4 +634,5 @@ const Voters = () => {
 };
 
 export default Voters;
+
 

@@ -4,11 +4,11 @@ import { ReactNode, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Vote, Users, UserCheck, Fingerprint, FileText,
-  Brain, ShieldAlert, Settings, LogOut, Bell, Search, Shield, Loader2,
+  Brain, ShieldAlert, Settings, LogOut, Bell, Search, Shield, Loader2, ChevronRight,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Cookies from "js-cookie";
-import { getSystemSettings } from "@/services/adminService";
+import { getSystemSettings, getAuditLogs } from "@/services/adminService";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const menuItems = [
@@ -28,6 +28,15 @@ interface DashboardLayoutProps {
   breadcrumb?: string[];
 }
 
+interface AdminNotification {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  route: string;
+  read: boolean;
+}
+
 const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayoutProps) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -41,6 +50,11 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
   const [systemName, setSystemName] = useState("VOTING-SYSTEM");
   const [logoUrl, setLogoUrl] = useState("");
   const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
 
   const navigateTo = (path: string) => {
     const currentPath = pathname || "";
@@ -49,6 +63,50 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
     setPendingPath(path);
     router.push(path);
   };
+
+  const fetchNotifications = async () => {
+    setNotifLoading(true);
+    try {
+      const resp = await getAuditLogs();
+      if (!resp.success || !resp.data) return;
+
+      const mapped: AdminNotification[] = (resp.data as any[]).slice(0, 8).map((log: any) => {
+        let details: any = {};
+        try {
+          details = log.details ? JSON.parse(log.details) : {};
+        } catch {
+          details = {};
+        }
+
+        const resource = String(log.resource_type || '').toUpperCase();
+        const route =
+          resource === 'ELECTION' ? "/h3xG9Lz_admin/dashboard/elections" :
+            resource === 'CANDIDATE' ? "/h3xG9Lz_admin/dashboard/candidates" :
+              resource === 'VOTER' || resource === 'USER' ? "/h3xG9Lz_admin/dashboard/voters" :
+                "/h3xG9Lz_admin/dashboard/audit";
+
+        return {
+          id: log.id || `${log.created_at}-${log.action}`,
+          title: String(log.action || 'System Update').replace(/_/g, ' '),
+          description: details?.description || `${log.resource_type || 'SYSTEM'} ${log.status || ''}`.trim(),
+          time: log.created_at ? new Date(log.created_at).toLocaleString() : "Unknown time",
+          route,
+          read: false
+        };
+      });
+
+      setNotifications(mapped);
+    } catch (error) {
+      console.error("Failed to fetch notifications:", error);
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const filteredMenuItems = menuItems.filter((item) =>
+    item.title.toLowerCase().includes(searchText.toLowerCase().trim())
+  );
 
   useEffect(() => {
     async function fetchSettings() {
@@ -72,8 +130,31 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
   }, []);
 
   useEffect(() => {
+    fetchNotifications();
+    const timer = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     setPendingPath(null);
   }, [pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+        setIsNotifOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   return (
     <div className="min-h-screen flex admin-shell">
@@ -177,13 +258,78 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
               <span className="text-[11px] text-success/90 tracking-wider font-medium">SYSTEM ONLINE</span>
             </div>
             <ThemeToggle />
-            <button className="w-8 h-8 rounded-lg border border-transparent flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50 transition-all duration-300">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="w-8 h-8 rounded-lg border border-transparent flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50 transition-all duration-300"
+              title="Search (Ctrl/Cmd + K)"
+            >
               <Search className="w-4 h-4" />
             </button>
-            <button className="w-8 h-8 rounded-lg border border-transparent flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50 transition-all duration-300 relative">
-              <Bell className="w-4 h-4" />
-              <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsNotifOpen((prev) => !prev);
+                  setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                }}
+                className="w-8 h-8 rounded-lg border border-transparent flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50 transition-all duration-300 relative"
+                title="Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <div className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-1 rounded-full bg-destructive text-[9px] text-white flex items-center justify-center leading-none">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </div>
+                )}
+              </button>
+              <AnimatePresence>
+                {isNotifOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    className="absolute right-0 mt-2 w-[360px] admin-card rounded-xl p-3 z-[120]"
+                  >
+                    <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/30 mb-2">
+                      <p className="text-xs font-medium text-foreground">Notifications</p>
+                      <button
+                        onClick={() => navigateTo("/h3xG9Lz_admin/dashboard/audit")}
+                        className="text-[10px] text-primary hover:underline"
+                      >
+                        Open Audit Trail
+                      </button>
+                    </div>
+                    <div className="max-h-[340px] overflow-auto space-y-1">
+                      {notifLoading ? (
+                        <div className="p-4 text-xs text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Loading notifications...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <p className="p-4 text-xs text-muted-foreground">No notifications yet.</p>
+                      ) : (
+                        notifications.map((n) => (
+                          <button
+                            key={n.id}
+                            onClick={() => {
+                              setIsNotifOpen(false);
+                              navigateTo(n.route);
+                            }}
+                            className="w-full text-left rounded-lg px-2.5 py-2.5 hover:bg-muted/40 transition-colors border border-transparent hover:border-border/50"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-[11px] text-foreground font-medium uppercase tracking-wide">{n.title}</p>
+                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.description}</p>
+                            <p className="text-[10px] text-muted-foreground/70 mt-1.5">{n.time}</p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ml-2 text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(270, 91%, 65%))" }}>
               A
             </div>
@@ -215,6 +361,67 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
           </p>
         </footer>
       </div>
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[130] bg-background/70 backdrop-blur-sm p-4 flex items-start justify-center pt-[12vh]"
+            onClick={() => setIsSearchOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              className="w-full max-w-[620px] admin-card rounded-2xl p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  autoFocus
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && filteredMenuItems[0]) {
+                      navigateTo(filteredMenuItems[0].path);
+                      setIsSearchOpen(false);
+                      setSearchText("");
+                    }
+                  }}
+                  placeholder="Search pages... (Dashboard, Elections, Candidates)"
+                  className="admin-input h-12 pl-10 pr-4 text-sm"
+                />
+              </div>
+              <div className="mt-3 rounded-xl border border-border/40 overflow-hidden">
+                {filteredMenuItems.length === 0 ? (
+                  <p className="px-4 py-5 text-sm text-muted-foreground">No matching pages.</p>
+                ) : (
+                  filteredMenuItems.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => {
+                        navigateTo(item.path);
+                        setIsSearchOpen(false);
+                        setSearchText("");
+                      }}
+                      className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-muted/35 border-b border-border/30 last:border-b-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className="w-4 h-4 text-primary" />
+                        <span className="text-sm text-foreground">{item.title}</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  ))
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-3">Shortcut: Ctrl/Cmd + K</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

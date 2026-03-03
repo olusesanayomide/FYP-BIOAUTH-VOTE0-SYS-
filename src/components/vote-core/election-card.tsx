@@ -157,13 +157,13 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
 
   return (
     <section className="animate-fade-in-up w-full">
-      <div className="bg-card border border-border/20 rounded-2xl overflow-hidden shadow-lg transition-all duration-300">
+      <div className="bg-card border border-border/30 rounded-2xl overflow-hidden shadow-lg transition-all duration-300">
         <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-8">
 
           {/* Left content */}
           <div className="space-y-4 max-w-2xl flex-1">
             <div className="flex flex-wrap items-center gap-4">
-              <h3 className="text-2xl font-bold text-white tracking-tight">
+              <h3 className="text-2xl font-bold text-foreground tracking-tight">
                 {election.title}
               </h3>
               {election.status === "suspended" ? (
@@ -173,12 +173,12 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
                 </span>
               ) : isOngoing ? (
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Ongoing
                   </span>
                   {timeLeft && (
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-400/90 bg-emerald-500/5 px-3 py-1 rounded-full border border-emerald-500/10">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400/90 bg-emerald-500/5 px-3 py-1 rounded-full border border-emerald-500/20">
                       <Clock className="w-3.5 h-3.5" />
                       Ends in: {timeLeft}
                     </span>
@@ -186,36 +186,36 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
                 </div>
               ) : isUpcoming ? (
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1 text-sm font-medium text-blue-400 border border-blue-500/20">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-400 border border-blue-500/30">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
                     Upcoming
                   </span>
                   {timeLeft && (
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-blue-400/90 bg-blue-500/5 px-3 py-1 rounded-full border border-blue-500/10">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-blue-700 dark:text-blue-400/90 bg-blue-500/5 px-3 py-1 rounded-full border border-blue-500/20">
                       <Clock className="w-3.5 h-3.5" />
                       Starts in: {timeLeft}
                     </span>
                   )}
                 </div>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-500/10 px-3 py-1 text-sm font-medium text-zinc-400 border border-zinc-500/20">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-500/10 px-3 py-1 text-sm font-medium text-zinc-700 dark:text-zinc-400 border border-zinc-500/30">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   Completed
                 </span>
               )}
             </div>
 
-            <p className="text-[15px] leading-relaxed text-slate-300 max-w-[90%]">
+            <p className="text-[15px] leading-relaxed text-foreground/75 dark:text-slate-300 max-w-[90%]">
               {election.description || "Cast your vote in this important election. Your voice matters in shaping the future of student governance."}
             </p>
 
-            <div className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-400 pt-2">
+            <div className="flex flex-wrap items-center gap-5 text-sm font-medium text-foreground/65 dark:text-slate-400 pt-2">
               <span className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-emerald-500/70" />
+                <Building2 className="h-4 w-4 text-emerald-600/80 dark:text-emerald-500/70" />
                 {institutionName}
               </span>
               <span className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-emerald-500/70" />
+                <Calendar className="h-4 w-4 text-emerald-600/80 dark:text-emerald-500/70" />
                 {formatDateRange()}
               </span>
             </div>
@@ -226,7 +226,7 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
             canVote ? (
               <button
                 onClick={() => setIsVoting(true)}
-                className="group flex items-center justify-center gap-4 rounded-2xl bg-[#8b5cf6] px-8 py-5 text-base font-semibold text-white transition-all hover:bg-[#7c3aed] hover:shadow-[0_0_20px_rgba(139,92,246,0.3)] shadow-md flex-shrink-0"
+                className="group flex items-center justify-center gap-4 rounded-2xl bg-primary px-8 py-5 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] shadow-md flex-shrink-0"
               >
                 <div className="flex flex-col items-center leading-snug text-left">
                   <span>Cast Your</span>
@@ -251,7 +251,7 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
           ) : (!isOngoing && !isUpcoming) ? (
             <button
               disabled
-              className="px-6 py-4 rounded-xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400 font-medium cursor-not-allowed flex items-center gap-2 flex-shrink-0 transition-opacity"
+              className="px-6 py-4 rounded-xl bg-muted/45 dark:bg-zinc-800/40 border border-border/60 dark:border-zinc-700/50 text-foreground/65 dark:text-zinc-400 font-medium cursor-not-allowed flex items-center gap-2 flex-shrink-0 transition-opacity"
             >
               Voting Concluded
             </button>
@@ -260,7 +260,7 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
 
         {/* Voting Expansion Panel */}
         {isVoting && !submitSuccess && (
-          <div className="border-t border-border/40 bg-[#161b22]/50 p-6 md:p-8 animate-fade-in">
+          <div className="border-t border-border/40 bg-muted/25 dark:bg-[#161b22]/50 p-6 md:p-8 animate-fade-in">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-xl font-bold text-foreground">Official Ballot</h3>
               <button
@@ -330,9 +330,9 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
                                 <div>
                                   <p className={`font-bold text-lg leading-tight mb-2 ${isSelected ? 'text-[#8b5cf6]' : 'text-foreground'}`}>{cand.name}</p>
                                   {cand.platform ? (
-                                    <p className="text-sm text-slate-400 line-clamp-3 leading-relaxed">{cand.platform}</p>
+                                    <p className="text-sm text-foreground/70 dark:text-slate-400 line-clamp-3 leading-relaxed">{cand.platform}</p>
                                   ) : (
-                                    <p className="text-sm text-slate-500 italic">No manifesto provided.</p>
+                                    <p className="text-sm text-foreground/55 dark:text-slate-500 italic">No manifesto provided.</p>
                                   )}
                                   <a
                                     href={`/dashboard/candidate/${cand.id}`}

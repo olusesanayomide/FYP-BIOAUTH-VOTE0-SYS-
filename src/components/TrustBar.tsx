@@ -11,18 +11,18 @@ const logos = [
 
 const TrustBar = () => {
   return (
-    <section className="relative border-y border-border/40 bg-secondary/30">
-      <div className="max-w-7xl mx-auto px-6 py-10 md:py-12">
+    <section className="relative border-y border-border/40 bg-secondary/25">
+      <div className="max-w-7xl mx-auto px-6 py-8 md:py-9">
         <motion.p
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-center text-xs font-medium text-muted-foreground tracking-widest uppercase mb-8"
+          className="text-center text-xs font-medium text-muted-foreground tracking-widest uppercase mb-6"
         >
           Trusted by 120+ Universities and Organizations
         </motion.p>
-        <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16">
+        <div className="flex flex-wrap items-center justify-center gap-6 md:gap-12">
           {logos.map((name, i) => (
             <motion.div
               key={name}

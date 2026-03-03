@@ -17,9 +17,9 @@ const footerColumns = [
 
 const Footer = () => {
   return (
-    <footer id="contact" className="border-t border-border/40 bg-secondary/50 section-padding py-16 md:py-20">
+    <footer id="contact" className="border-t border-border/40 bg-secondary/40 section-padding py-14 md:py-16">
       <div className="max-w-7xl mx-auto">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-14">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {/* Brand */}
           <div>
             <span className="text-base font-bold text-foreground">SecureVote</span>
@@ -49,7 +49,7 @@ const Footer = () => {
 
         <div className="border-t border-border/40 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            © 2026 SecureVote. All Rights Reserved.
+            (c) 2026 SecureVote. All Rights Reserved.
           </p>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Lock className="w-3 h-3" />
@@ -62,3 +62,4 @@ const Footer = () => {
 };
 
 export default Footer;
+

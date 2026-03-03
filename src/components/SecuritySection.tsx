@@ -18,7 +18,7 @@ const SecuritySection = () => {
       <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-primary/5 blur-[150px] rounded-full -translate-y-1/2 pointer-events-none" />
 
       <div className="max-w-7xl mx-auto relative z-10">
-        <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left - Dashboard Mockup */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -89,7 +89,7 @@ const SecuritySection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-3xl md:text-4xl font-bold mb-8"
+              className="text-3xl md:text-4xl font-bold mb-6"
             >
               Built With Military-Grade Security
             </motion.h2>
