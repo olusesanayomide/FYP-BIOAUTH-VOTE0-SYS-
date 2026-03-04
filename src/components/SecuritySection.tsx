@@ -7,7 +7,6 @@ const features = [
   { icon: Lock, label: "End-to-End Encryption (AES-256)" },
   { icon: ScanFace, label: "WebAuthn Biometric Protocol" },
   { icon: ShieldAlert, label: "Anti-Duplicate Vote Detection" },
-  { icon: Blocks, label: "Blockchain-backed Audit Trail" },
   { icon: Activity, label: "Real-time Monitoring System" },
 ];
 
