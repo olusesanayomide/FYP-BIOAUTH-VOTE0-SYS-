@@ -21,6 +21,111 @@ const ORIGIN = process.env.ORIGIN || 'http://localhost:3000';
 const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '15'); // Increased from 10 to 15 minutes
 const OTP_RATE_LIMIT_MINUTES = 1;
 
+const normalizeEmail = (value: string | null | undefined) => String(value || '').trim().toLowerCase();
+
+const syncUserEmailFromInstitutionRecord = async (user: any) => {
+  const userEmail = normalizeEmail(user?.email);
+  if (!user?.id) return user;
+
+  let schoolStudent: any = null;
+
+  if (user.school_student_id) {
+    const { data } = await supabase
+      .from('school_students')
+      .select('id, email, matric_no')
+      .eq('id', user.school_student_id)
+      .maybeSingle();
+    schoolStudent = data || null;
+  }
+
+  if (!schoolStudent && user.matric_no) {
+    const { data } = await supabase
+      .from('school_students')
+      .select('id, email, matric_no')
+      .ilike('matric_no', String(user.matric_no).trim())
+      .limit(1)
+      .maybeSingle();
+    schoolStudent = data || null;
+  }
+
+  const institutionalEmail = normalizeEmail(schoolStudent?.email);
+  if (!institutionalEmail || institutionalEmail === userEmail) {
+    return user;
+  }
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ email: institutionalEmail })
+    .eq('id', user.id);
+
+  if (!updateError) {
+    return { ...user, email: institutionalEmail };
+  }
+
+  return user;
+};
+
+const resolveUserByIdentifier = async (rawIdentifier: string) => {
+  const identifier = String(rawIdentifier || '').trim();
+  if (!identifier) {
+    throw new ApiError(400, 'Missing identifier (matric number or email)', 'MISSING_FIELDS');
+  }
+
+  const isEmail = identifier.includes('@');
+  const query = supabase.from('users').select('*');
+  const { data: users, error } = isEmail
+    ? await query.ilike('email', identifier).limit(2)
+    : await query.ilike('matric_no', identifier).limit(2);
+
+  if (error || !users || users.length === 0) {
+    if (isEmail) {
+      // Self-heal when users.email is stale but institutional email was updated in school_students.
+      const { data: schoolStudents } = await supabase
+        .from('school_students')
+        .select('id, email, matric_no')
+        .ilike('email', identifier)
+        .limit(2);
+
+      if (schoolStudents && schoolStudents.length === 1 && schoolStudents[0].matric_no) {
+        const { data: usersByMatric } = await supabase
+          .from('users')
+          .select('*')
+          .ilike('matric_no', String(schoolStudents[0].matric_no).trim())
+          .limit(2);
+
+        if (usersByMatric && usersByMatric.length === 1) {
+          const recoveredUser = usersByMatric[0];
+          await supabase
+            .from('users')
+            .update({ email: normalizeEmail(identifier), school_student_id: schoolStudents[0].id })
+            .eq('id', recoveredUser.id);
+          return { ...recoveredUser, email: normalizeEmail(identifier), school_student_id: schoolStudents[0].id };
+        }
+
+        if (usersByMatric && usersByMatric.length > 1) {
+          throw new ApiError(
+            409,
+            'Multiple accounts match this matric number. Contact support to resolve account data.',
+            'AMBIGUOUS_IDENTIFIER',
+          );
+        }
+      }
+    }
+
+    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
+  }
+
+  if (users.length > 1) {
+    throw new ApiError(
+      409,
+      'Multiple accounts match this identifier. Contact support to resolve account data before retrying.',
+      'AMBIGUOUS_IDENTIFIER',
+    );
+  }
+
+  return syncUserEmailFromInstitutionRecord(users[0]);
+};
+
 
 
 /**
@@ -695,17 +800,7 @@ export const verifyWebauthnAuthentication = async (userId: string, response: any
  * identifier may be matric_no or email
  */
 export const getWebauthnAuthenticationOptionsPublic = async (identifier: string) => {
-  // Find user by matric_no or email
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .or(`matric_no.eq.${identifier},email.eq.${identifier}`)
-    .limit(1)
-    .single();
-
-  if (userError || !user) {
-    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
-  }
+  const user = await resolveUserByIdentifier(identifier);
 
   return getWebauthnAuthenticationOptions(user.id);
 };
@@ -719,17 +814,7 @@ export const verifyWebauthnAuthenticationPublic = async (
   ipAddress?: string,
   userAgent?: string,
 ) => {
-  // Find user
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .or(`matric_no.eq.${identifier},email.eq.${identifier}`)
-    .limit(1)
-    .single();
-
-  if (userError || !user) {
-    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
-  }
+  const user = await resolveUserByIdentifier(identifier);
 
   // Verify biometric
   const verified = await verifyWebauthnAuthentication(user.id, response);
@@ -766,17 +851,7 @@ export const verifyWebauthnAuthenticationPublic = async (
  * Request OTP for login (fallback for users without WebAuthn)
  */
 export const requestLoginOtp = async (identifier: string) => {
-  // Find user by matric_no or email
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .or(`matric_no.eq.${identifier},email.eq.${identifier}`)
-    .limit(1)
-    .single();
-
-  if (userError || !user) {
-    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
-  }
+  const user = await resolveUserByIdentifier(identifier);
 
   // Rate limiting
   if (user.last_otp_request_at) {
@@ -835,16 +910,7 @@ export const verifyLoginOtp = async (
   ipAddress?: string,
   userAgent?: string,
 ) => {
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .or(`matric_no.eq.${identifier},email.eq.${identifier}`)
-    .limit(1)
-    .single();
-
-  if (userError || !user) {
-    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
-  }
+  const user = await resolveUserByIdentifier(identifier);
 
   // Check OTP expiry (using UTC timestamps for consistency)
   if (!user.otp_expires_at) {

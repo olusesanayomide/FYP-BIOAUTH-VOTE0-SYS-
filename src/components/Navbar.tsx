@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Fingerprint, Menu, X } from "lucide-react";
+import { Shield, Fingerprint, Menu, X, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -17,9 +17,16 @@ const navLinks = [
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isNavigatingToLogin, setIsNavigatingToLogin] = useState(false);
   const [systemName, setSystemName] = useState("SecureVote");
   const [systemLogo, setSystemLogo] = useState("");
   const router = useRouter();
+
+  const handleLoginClick = () => {
+    if (isNavigatingToLogin) return;
+    setIsNavigatingToLogin(true);
+    router.push("/login");
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -67,11 +74,13 @@ const Navbar = () => {
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
-          <button onClick={() => router.push("/login")} className="text-sm text-muted-foreground hover:text-foreground border border-border px-5 py-2 rounded-lg transition-all duration-300 hover:border-muted-foreground/50">
-            Login
-          </button>
-          <button className="text-sm font-medium text-primary-foreground gradient-cta px-5 py-2 rounded-lg transition-all duration-300 hover:scale-[1.03] glow-blue">
-            Verify Identity
+          <button
+            onClick={handleLoginClick}
+            disabled={isNavigatingToLogin}
+            className="text-sm text-muted-foreground hover:text-foreground border border-border px-5 py-2 rounded-lg transition-all duration-300 hover:border-muted-foreground/50 disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center gap-2"
+          >
+            {isNavigatingToLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {isNavigatingToLogin ? "Opening..." : "Login"}
           </button>
         </div>
 
@@ -109,11 +118,16 @@ const Navbar = () => {
                 <ThemeToggle />
               </div>
               <div className="flex flex-col gap-3 pt-4 border-t border-border/50">
-                <button onClick={() => { setMobileOpen(false); router.push("/login"); }} className="text-sm text-muted-foreground border border-border px-5 py-2.5 rounded-lg">
-                  Login
-                </button>
-                <button className="text-sm font-medium text-primary-foreground gradient-cta px-5 py-2.5 rounded-lg">
-                  Verify Identity
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    handleLoginClick();
+                  }}
+                  disabled={isNavigatingToLogin}
+                  className="text-sm text-muted-foreground border border-border px-5 py-2.5 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                >
+                  {isNavigatingToLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {isNavigatingToLogin ? "Opening..." : "Login"}
                 </button>
               </div>
             </div>

@@ -77,6 +77,7 @@ router.post('/submit', authMiddleware, async (req: AuthenticatedRequest, res: Re
     const result = await votingService.submitVote(req.user.id, {
       electionId,
       votes,
+      webauthnVerificationProof,
     });
 
     res.status(201).json(result);

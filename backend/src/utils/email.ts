@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import path from 'path';
 
 /**
  * Send OTP via Resend API if RESEND_API_KEY is provided, otherwise fall back to SMTP via nodemailer.
@@ -51,17 +50,10 @@ const initializeSmtpTransporter = () => {
 };
 
 export const sendOtpEmail = async (email: string, otp: string, name: string) => {
-  console.log(`\n\n!!! INTERCEPTED OTP FOR TESTING !!!\nEMAIL: ${email}\nOTP: ${otp}\n\n`);
-  try {
-    const fs = require('fs');
-    const otpFile = path.join(process.cwd(), 'latest_otp.txt');
-    fs.writeFileSync(otpFile, otp);
-  } catch (e) {
-    console.warn('Failed to write latest_otp.txt (non-fatal):', e);
-  }
   const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
   const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
   const recipient = forcedRecipient || email;
+  const textBody = `Hello ${name}, your one-time verification code is ${otp}. This code expires in 15 minutes.`;
 
   // If RESEND_API_KEY is set, prefer Resend API
   const resendKey = process.env.RESEND_API_KEY;
@@ -100,32 +92,25 @@ export const sendOtpEmail = async (email: string, otp: string, name: string) => 
   // Fallback to SMTP
   try {
     const transporter = initializeSmtpTransporter();
-    await transporter.sendMail({
+    await transporter.verify();
+
+    const info = await transporter.sendMail({
       from,
       to: recipient,
       subject: 'Your Biometric Voting Registration OTP',
       html: buildHtml(name, otp),
+      text: textBody,
+      replyTo: from,
     });
 
+    if (Array.isArray(info.rejected) && info.rejected.length > 0) {
+      throw new Error(`SMTP rejected recipient(s): ${info.rejected.join(', ')}`);
+    }
+
+    console.log(`[EMAIL] OTP email accepted by SMTP server for recipient: ${recipient}`);
     return { success: true };
   } catch (error) {
     console.error('Failed to send OTP email via SMTP:', error);
-
-    // Development fallback: log to console
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`
-╔═══════════════════════════════════════════════════════════╗
-║                 OTP EMAIL (DEVELOPMENT MODE)               ║
-╠═══════════════════════════════════════════════════════════╣
-║ To: ${email.padEnd(54)}║
-║ Name: ${name.padEnd(51)}║
-║ OTP Code: ${otp.padEnd(48)}║
-║ Expires in: 10 minutes                                    ║
-╚═══════════════════════════════════════════════════════════╝
-      `);
-      return { success: true };
-    }
-
     throw new Error('Failed to send verification code');
   }
 };

@@ -1,8 +1,20 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 const CTASection = () => {
+  const router = useRouter();
+  const [isNavigatingToLogin, setIsNavigatingToLogin] = useState(false);
+
+  const handleLoginClick = () => {
+    if (isNavigatingToLogin) return;
+    setIsNavigatingToLogin(true);
+    router.push("/login");
+  };
+
   return (
     <section className="section-spacing section-padding relative overflow-hidden">
       <div className="absolute inset-0 gradient-cta-section pointer-events-none" />
@@ -31,8 +43,13 @@ const CTASection = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <button className="gradient-cta text-primary-foreground font-semibold px-8 py-3.5 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm md:text-base">
-            Start Secure Election
+          <button
+            onClick={handleLoginClick}
+            disabled={isNavigatingToLogin}
+            className="gradient-cta text-primary-foreground font-semibold px-8 py-3.5 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm md:text-base inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isNavigatingToLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {isNavigatingToLogin ? "Opening Login..." : "Proceed to Login"}
           </button>
         </motion.div>
       </div>

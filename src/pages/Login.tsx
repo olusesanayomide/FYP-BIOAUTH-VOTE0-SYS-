@@ -28,6 +28,35 @@ const Login = () => {
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
 
+  const getFriendlyWebAuthnError = (err: any) => {
+    const name = err?.name || "";
+    const message = String(err?.message || "");
+    const combined = `${name} ${message}`.toLowerCase();
+
+    if (
+      name === "NotAllowedError" ||
+      combined.includes("timed out") ||
+      combined.includes("not allowed") ||
+      combined.includes("privacy-considerations-client")
+    ) {
+      return "Biometric verification was canceled or timed out. Please try again or use OTP fallback.";
+    }
+
+    if (name === "AbortError") {
+      return "Biometric verification was interrupted. Please try again.";
+    }
+
+    if (name === "SecurityError" || name === "NotSupportedError") {
+      return "Biometric verification is not supported in this browser/device setup.";
+    }
+
+    if (name === "InvalidStateError") {
+      return "Your biometric credential is not available on this device. Try another device or use OTP fallback.";
+    }
+
+    return "Biometric verification failed. Please try again or use OTP fallback.";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: typeof errors = {};
@@ -70,41 +99,8 @@ const Login = () => {
         console.error("[WebAuthn Auth] startAuthentication failed:", err);
         console.error("Error name:", err.name, "Error message:", err.message);
 
-        // Try raw navigator.credentials.get as fallback to see detailed browser errors
-        try {
-          console.log("[WebAuthn Auth] Attempting fallback with raw navigator.credentials.get...");
-          // We need to convert the base64url encoded challenge and allowCredentials
-          const challengeBuffer = Uint8Array.from(atob(opts.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-          const allowCredentials = opts.allowCredentials?.map((cred: any) => ({
-            type: cred.type,
-            id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
-            transports: cred.transports
-          }));
-
-          const rawOptions: CredentialRequestOptions = {
-            publicKey: {
-              challenge: challengeBuffer,
-              rpId: opts.rpId,
-              allowCredentials: allowCredentials,
-              userVerification: opts.userVerification,
-              timeout: opts.timeout,
-            }
-          };
-          console.log("[WebAuthn Auth] Raw options:", rawOptions);
-          const rawCred = await navigator.credentials.get(rawOptions);
-          console.log("[WebAuthn Auth] Raw navigator.credentials.get successful:", rawCred);
-
-          setLoading(false);
-          setErrors({ email: "Raw auth succeeded, but simplewebauthn failed. Check console." });
-          setStage('credentials');
-          return;
-
-        } catch (rawErr: any) {
-          console.error("[WebAuthn Auth] Raw navigator.credentials.get also failed:", rawErr);
-        }
-
         setLoading(false);
-        setErrors({ email: err.message || 'Biometric authentication was cancelled or failed' });
+        setErrors({ email: getFriendlyWebAuthnError(err) });
         setStage('credentials');
         return;
       }
@@ -125,7 +121,7 @@ const Login = () => {
     } catch (err: any) {
       console.error("[WebAuthn Auth] Top-level error:", err);
       setLoading(false);
-      setErrors({ email: err?.message || 'Biometric authentication failed' });
+      setErrors({ email: getFriendlyWebAuthnError(err) });
       setStage('credentials');
     }
   };

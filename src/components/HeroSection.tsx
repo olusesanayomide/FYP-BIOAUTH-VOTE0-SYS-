@@ -1,10 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BarChart3, Check, ChevronRight, Clock3, Fingerprint, ShieldCheck } from "lucide-react";
+import { BarChart3, Check, ChevronRight, Clock3, Fingerprint, ShieldCheck, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const HeroSection = () => {
+  const router = useRouter();
+  const [isNavigatingToLogin, setIsNavigatingToLogin] = useState(false);
   const [targetDate] = useState(() => {
     const t = new Date();
     t.setDate(t.getDate() + 5);
@@ -14,6 +17,12 @@ const HeroSection = () => {
   });
 
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  const handleLoginClick = () => {
+    if (isNavigatingToLogin) return;
+    setIsNavigatingToLogin(true);
+    router.push("/login");
+  };
 
   useEffect(() => {
     const tick = () => {
@@ -90,12 +99,14 @@ const HeroSection = () => {
               transition={{ duration: 0.5, delay: 0.9 }}
               className="flex flex-wrap gap-3"
             >
-              <button className="gradient-cta text-primary-foreground font-semibold px-7 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm inline-flex items-center gap-2">
-                Secure Biometric Login
+              <button
+                onClick={handleLoginClick}
+                disabled={isNavigatingToLogin}
+                className="gradient-cta text-primary-foreground font-semibold px-7 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isNavigatingToLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {isNavigatingToLogin ? "Opening Login..." : "Secure Biometric Login"}
                 <ChevronRight className="w-4 h-4" />
-              </button>
-              <button className="border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/50 font-medium px-7 py-3 rounded-xl transition-all duration-300 text-sm">
-                Explore Election Flow
               </button>
             </motion.div>
           </div>
@@ -137,10 +148,10 @@ const HeroSection = () => {
 
               <div className="rounded-2xl border border-border/70 dark:border-blue-400/20 bg-card/75 dark:bg-white/[0.04] backdrop-blur-xl p-4">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Secure Access</p>
-                <button className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-3 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors">
+                <div className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary/10 text-primary px-3 py-2.5 text-sm font-semibold border border-primary/20">
                   <ShieldCheck className="w-4 h-4" />
-                  Biometric Login
-                </button>
+                  Biometric access enforced
+                </div>
               </div>
 
               <div className="col-span-2 rounded-2xl border border-border/70 dark:border-blue-400/20 bg-card/75 dark:bg-white/[0.04] backdrop-blur-xl p-4">

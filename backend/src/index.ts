@@ -12,11 +12,15 @@ import { globalLimiter } from './middleware/rateLimiting';
 // Fix Node 18+ undici Supabase IPv6 ConnectTimeoutError
 dns.setDefaultResultOrder('ipv4first');
 
-// Fix Supabase TLS alert illegal parameter in Node.js native fetch 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
 // Load environment variables
 dotenv.config();
+
+// Keep TLS certificate verification enabled by default.
+// Only allow explicit insecure override in local development for debugging.
+if (process.env.NODE_ENV === 'development' && process.env.ALLOW_INSECURE_TLS === 'true') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  console.warn('[SECURITY] TLS certificate verification is disabled (development override).');
+}
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;

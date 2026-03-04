@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { ApiError } from '../middleware/errorHandler';
+import { verifyWebauthnAuthentication } from './authService';
 
 /**
  * Get all available elections dynamically filtered by voter's institution scope
@@ -294,6 +295,10 @@ export const submitVote = async (
   input: {
     electionId: string;
     votes: { positionId: string; candidateId: string }[];
+    webauthnVerificationProof?: {
+      assertionObject?: string;
+      clientDataJSON?: string;
+    };
   },
 ) => {
   // Validate array
@@ -321,6 +326,37 @@ export const submitVote = async (
 
   if (electionError || !election) {
     throw new ApiError(404, 'Election not found', 'ELECTION_NOT_FOUND');
+  }
+
+  const biometricsRequired = election.require_biometrics !== false;
+  let webauthnVerified = false;
+
+  if (biometricsRequired) {
+    const assertionObject = input.webauthnVerificationProof?.assertionObject;
+    if (!assertionObject || typeof assertionObject !== 'string') {
+      throw new ApiError(
+        400,
+        'Biometric verification proof is required to submit this ballot',
+        'BIOMETRIC_PROOF_REQUIRED',
+      );
+    }
+
+    let parsedAssertion: any;
+    try {
+      parsedAssertion = JSON.parse(assertionObject);
+    } catch {
+      throw new ApiError(400, 'Invalid biometric verification proof format', 'INVALID_BIOMETRIC_PROOF');
+    }
+
+    if (!parsedAssertion?.id || !parsedAssertion?.response) {
+      throw new ApiError(400, 'Biometric verification proof is incomplete', 'INVALID_BIOMETRIC_PROOF');
+    }
+
+    const verificationResult = await verifyWebauthnAuthentication(userId, parsedAssertion);
+    if (!verificationResult?.verified) {
+      throw new ApiError(403, 'Biometric verification failed. Vote not accepted.', 'BIOMETRIC_VERIFICATION_FAILED');
+    }
+    webauthnVerified = true;
   }
 
   // Check election constraints globally (Time bounds)
@@ -420,8 +456,8 @@ export const submitVote = async (
       election_id: input.electionId,
       position_id: resolvedPositionId,
       selected_candidate_id: vote.candidateId,
-      webauthn_verified: election.require_biometrics !== false,
-      webauthn_timestamp: new Date(),
+      webauthn_verified: webauthnVerified,
+      webauthn_timestamp: webauthnVerified ? new Date() : null,
     });
   }
 
