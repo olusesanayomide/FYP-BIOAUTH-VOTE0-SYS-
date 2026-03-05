@@ -22,7 +22,7 @@
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted-foreground: 215.4 20% 33%;
 
     --accent: 160 84% 39%;
     --accent-foreground: 210 20% 98%;
@@ -30,8 +30,8 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 214 24% 84%;
+    --input: 214 24% 84%;
     --ring: 217 91% 53%;
 
     --radius: 1rem;
@@ -153,8 +153,8 @@
 
   .grid-pattern {
     background-image:
-      linear-gradient(hsl(var(--muted-foreground) / 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--muted-foreground) / 0.03) 1px, transparent 1px);
+      linear-gradient(hsl(var(--muted-foreground) / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--muted-foreground) / 0.06) 1px, transparent 1px);
     background-size: 60px 60px;
   }
 
@@ -187,7 +187,15 @@
   }
 
   .nav-blur {
-    @apply backdrop-blur-xl bg-background/80 border-b border-border/50;
+    @apply backdrop-blur-xl border-b;
+    background-color: hsl(var(--background) / 0.92);
+    border-color: hsl(var(--border) / 0.85);
+    box-shadow: 0 14px 32px -24px hsl(var(--foreground) / 0.24);
+  }
+
+  .dark .nav-blur {
+    @apply bg-background/80 border-border/50;
+    box-shadow: none;
   }
 
   .float-animation {

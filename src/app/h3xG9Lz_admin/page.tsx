@@ -41,7 +41,7 @@ const LoginPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberDevice }),
       });
 
       const data = await response.json();
@@ -52,7 +52,10 @@ const LoginPage = () => {
 
       setStatus("success");
       // Set the token inside a cookie called admin_token so the middleware reads it
-      Cookies.set("admin_token", data.data.accessToken, { expires: 1, path: "/" });
+      const cookieOptions = rememberDevice
+        ? { expires: 7, path: "/" as const }
+        : { path: "/" as const };
+      Cookies.set("admin_token", data.data.accessToken, cookieOptions);
 
       setTimeout(() => router.push("/h3xG9Lz_admin/dashboard"), 1500);
     } catch (err: any) {

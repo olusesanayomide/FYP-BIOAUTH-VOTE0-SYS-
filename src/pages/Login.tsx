@@ -12,14 +12,10 @@ type Stage = "credentials" | "biometric" | "otp" | "success";
 const Login = () => {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  // Password removed: using passwordless biometric login by identifier
   const [stage, setStage] = useState<Stage>("credentials");
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string }>({});
   const [shakeField, setShakeField] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [resetModal, setResetModal] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetSent, setResetSent] = useState(false);
   const [biometricProgress, setBiometricProgress] = useState(0);
 
   // OTP Fallback states
@@ -207,12 +203,6 @@ const Login = () => {
     }, 40);
   };
 
-  const handleResetSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetEmail) return;
-    setResetSent(true);
-  };
-
   return (
     <div className="min-h-screen bg-background relative flex items-center justify-center px-6 py-12">
       <div className="absolute inset-0 grid-pattern opacity-30" />
@@ -253,17 +243,17 @@ const Login = () => {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.35 }}
                 >
-                  <div className="mb-8">
+                  <div className="mb-8 text-center">
                     <h1 className="text-2xl font-bold text-foreground mb-2">Verify Your Identity</h1>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      Enter your credentials to access the secure voting portal.
+                      Use your Voter ID or email to continue with biometric verification or OTP.
                     </p>
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-5">
                     {/* Email / Voter ID */}
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                      <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider text-center">
                         Voter ID / Email
                       </label>
                       <motion.div
@@ -276,7 +266,7 @@ const Login = () => {
                             value={email}
                             onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: undefined })); }}
                             placeholder="voterID@securevote.com"
-                            className={`w-full bg-muted/40 border rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-all duration-300 focus:scale-[1.01] focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.15)] ${errors.email ? "border-destructive/50" : "border-border/50 focus:border-primary/50"
+                            className={`w-full bg-muted/40 border rounded-xl px-4 py-3.5 text-sm text-foreground text-center placeholder:text-muted-foreground/50 placeholder:text-center outline-none transition-all duration-300 focus:scale-[1.01] focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.15)] ${errors.email ? "border-destructive/50" : "border-border/50 focus:border-primary/50"
                               }`}
                           />
                           <Mail className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
@@ -286,7 +276,7 @@ const Login = () => {
                         <motion.p
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="text-xs text-destructive/80 mt-1.5"
+                          className="text-xs text-destructive/80 mt-1.5 text-center"
                         >
                           {errors.email}
                         </motion.p>
@@ -297,7 +287,7 @@ const Login = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full gradient-cta text-primary-foreground font-semibold py-3.5 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_-8px_hsl(var(--primary)/0.4)] disabled:opacity-70 disabled:hover:scale-100 text-sm flex items-center justify-center gap-2 mt-2"
+                      className="w-full bg-[#001F3F] text-white font-medium py-3 rounded-lg border border-white/10 shadow-sm transition-all duration-200 hover:bg-[#002b5a] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
                     >
                       {loading ? (
                         <motion.div
@@ -320,27 +310,16 @@ const Login = () => {
                       className="w-full bg-muted/40 text-foreground font-semibold py-3.5 rounded-xl transition-all duration-300 hover:bg-muted/60 disabled:opacity-70 text-sm flex items-center justify-center gap-2"
                     >
                       {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                      Login with OTP Fallback
+                      Login with OTP
                     </button>
                   </form>
 
                   {/* Secondary links */}
                   <div className="mt-8 flex flex-col items-center gap-2.5">
-                    <button
-                      onClick={() => { setResetModal(true); setResetSent(false); setResetEmail(""); }}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors relative group"
-                    >
-                      Forgot Password?
-                      <span className="absolute left-0 -bottom-0.5 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full" />
-                    </button>
                     <Link href="/register" className="text-xs text-muted-foreground hover:text-foreground transition-colors relative group">
-                      Register as New Voter
+                      Sign Up 
                       <span className="absolute left-0 -bottom-0.5 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full" />
                     </Link>
-                    <button className="text-xs text-muted-foreground hover:text-foreground transition-colors relative group">
-                      Contact Election Admin
-                      <span className="absolute left-0 -bottom-0.5 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full" />
-                    </button>
                   </div>
                 </motion.div>
               )}
@@ -521,73 +500,6 @@ const Login = () => {
           </div>
         </motion.div>
       </div>
-
-      {/* PASSWORD RESET MODAL */}
-      <AnimatePresence>
-        {resetModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-50 flex items-center justify-center px-6"
-            onClick={() => setResetModal(false)}
-          >
-            <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="relative z-10 w-full max-w-sm bg-card/80 backdrop-blur-2xl border border-border/40 rounded-2xl p-8 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setResetModal(false)}
-                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-
-              {!resetSent ? (
-                <>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">Reset Password</h3>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Enter your email to receive a secure reset link.
-                  </p>
-                  <form onSubmit={handleResetSubmit} className="space-y-4">
-                    <input
-                      type="email"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      placeholder="voterID@securevote.com"
-                      className="w-full bg-muted/40 border border-border/50 rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-all duration-300 focus:border-primary/50 focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.15)]"
-                    />
-                    <button
-                      type="submit"
-                      className="w-full gradient-cta text-primary-foreground font-semibold py-3 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02]"
-                    >
-                      Send Reset Link
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-4"
-                >
-                  <div className="w-12 h-12 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center mx-auto mb-4">
-                    <Check className="w-5 h-5 text-accent" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-1">Reset Link Sent</h3>
-                  <p className="text-sm text-muted-foreground">Reset link sent securely to your email.</p>
-                </motion.div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

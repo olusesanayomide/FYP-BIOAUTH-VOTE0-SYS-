@@ -121,7 +121,7 @@ const Elections = () => {
             maxVotes: dbElection.max_votes || 1,
             biometricEnforced: dbElection.biometric_enforced || false,
             realTimeMonitoring: dbElection.real_time_monitoring || false,
-            eligibilityRules: "All registered students", // Mocked for now
+            eligibilityRules: dbElection.eligibility_rules || "All registered students",
             registeredVoters: dbElection.registeredVoters || 0,
             verifiedBiometric: dbElection.verifiedBiometric || 0,
             votesCast: dbElection.votesCast || 0,

@@ -125,26 +125,45 @@ export const createElection = async (electionData: any, adminId: string) => {
             throw new ApiError(400, 'Name, start date, and end date are required', 'VALIDATION_ERROR');
         }
 
-        const { data, error } = await supabase
+        const basePayload: any = {
+            title: name,
+            description: description,
+            type: type,
+            status: 'upcoming',
+            start_time: startDate,
+            end_time: endDate,
+            voting_method: votingMethod,
+            max_votes: maxVotes,
+            require_biometrics: biometricEnforced,
+            biometric_enforced: biometricEnforced,
+            real_time_monitoring: realTimeMonitoring,
+            scope_faculty: scopeFaculty,
+            scope_department: scopeDepartment,
+            scope_level: scopeLevel ? parseInt(scopeLevel) : 0,
+        };
+
+        if (eligibilityRules) {
+            basePayload.eligibility_rules = eligibilityRules;
+        }
+
+        let { data, error } = await supabase
             .from('elections')
-            .insert([{
-                title: name,
-                description: description,
-                type: type,
-                status: 'upcoming',
-                start_time: startDate,
-                end_time: endDate,
-                voting_method: votingMethod,
-                max_votes: maxVotes,
-                require_biometrics: biometricEnforced,
-                biometric_enforced: biometricEnforced,
-                real_time_monitoring: realTimeMonitoring,
-                scope_faculty: scopeFaculty,
-                scope_department: scopeDepartment,
-                scope_level: scopeLevel ? parseInt(scopeLevel) : 0,
-            }])
+            .insert([basePayload])
             .select()
             .single();
+
+        // Backward-compatibility: if the column does not exist yet, retry without it.
+        if (error && eligibilityRules && String((error as any).message || '').toLowerCase().includes('eligibility_rules')) {
+            const fallbackPayload = { ...basePayload };
+            delete fallbackPayload.eligibility_rules;
+            const retry = await supabase
+                .from('elections')
+                .insert([fallbackPayload])
+                .select()
+                .single();
+            data = retry.data;
+            error = retry.error;
+        }
 
         if (error) throw error;
 
@@ -359,6 +378,19 @@ export const getAllVoters = async () => {
             voteRows = votesData || [];
         }
 
+        let loginRows: any[] = [];
+        if (voterIds.length > 0) {
+            const { data: auditData, error: auditError } = await supabase
+                .from('audit_logs')
+                .select('user_id, action, created_at, ip_address, user_agent')
+                .in('user_id', voterIds)
+                .in('action', ['WEBAUTHN_LOGIN_SUCCESS', 'LOGIN_OTP_SUCCESS'])
+                .order('created_at', { ascending: false });
+
+            if (auditError) throw auditError;
+            loginRows = auditData || [];
+        }
+
         const lastVotedAtByUser = new Map<string, string>();
         for (const row of voteRows) {
             const existing = lastVotedAtByUser.get(row.voter_id);
@@ -367,10 +399,35 @@ export const getAllVoters = async () => {
             }
         }
 
+        const latestLoginByUser = new Map<string, any>();
+        const loginHistoryByUser = new Map<string, any[]>();
+
+        for (const row of loginRows) {
+            if (!row.user_id) continue;
+
+            if (!latestLoginByUser.has(row.user_id)) {
+                latestLoginByUser.set(row.user_id, row);
+            }
+
+            const history = loginHistoryByUser.get(row.user_id) || [];
+            if (history.length < 5) {
+                history.push(row);
+                loginHistoryByUser.set(row.user_id, history);
+            }
+        }
+
         const enriched = (data || []).map((u: any) => ({
             ...u,
             has_voted: lastVotedAtByUser.has(u.id),
-            last_voted_at: lastVotedAtByUser.get(u.id) || null
+            last_voted_at: lastVotedAtByUser.get(u.id) || null,
+            last_login_at: latestLoginByUser.get(u.id)?.created_at || null,
+            last_login_ip: latestLoginByUser.get(u.id)?.ip_address || null,
+            last_login_user_agent: latestLoginByUser.get(u.id)?.user_agent || null,
+            login_history: (loginHistoryByUser.get(u.id) || []).map((entry: any) => ({
+                created_at: entry.created_at,
+                ip_address: entry.ip_address,
+                user_agent: entry.user_agent
+            }))
         }));
 
         return {
@@ -728,33 +785,54 @@ export const updateElection = async (id: string, electionData: any, adminId: str
     try {
         const {
             name, description, type, scopeFaculty, scopeDepartment, scopeLevel,
-            startDate, endDate, votingMethod, maxVotes, biometricEnforced, realTimeMonitoring
+            startDate, endDate, votingMethod, maxVotes, biometricEnforced, realTimeMonitoring,
+            eligibilityRules
         } = electionData;
 
         if (!name || !startDate || !endDate) {
             throw new ApiError(400, 'Name, start date, and end date are required', 'VALIDATION_ERROR');
         }
 
-        const { data, error } = await supabase
+        const updatePayload: any = {
+            title: name,
+            description: description,
+            type: type,
+            start_time: startDate === "" ? null : startDate,
+            end_time: endDate === "" ? null : endDate,
+            voting_method: votingMethod,
+            max_votes: maxVotes,
+            require_biometrics: biometricEnforced,
+            biometric_enforced: biometricEnforced,
+            real_time_monitoring: realTimeMonitoring,
+            scope_faculty: scopeFaculty,
+            scope_department: scopeDepartment,
+            scope_level: scopeLevel ? parseInt(scopeLevel.toString()) : 0,
+        };
+
+        if (typeof eligibilityRules === 'string') {
+            updatePayload.eligibility_rules = eligibilityRules;
+        }
+
+        let { data, error } = await supabase
             .from('elections')
-            .update({
-                title: name,
-                description: description,
-                type: type,
-                start_time: startDate === "" ? null : startDate,
-                end_time: endDate === "" ? null : endDate,
-                voting_method: votingMethod,
-                max_votes: maxVotes,
-                require_biometrics: biometricEnforced,
-                biometric_enforced: biometricEnforced,
-                real_time_monitoring: realTimeMonitoring,
-                scope_faculty: scopeFaculty,
-                scope_department: scopeDepartment,
-                scope_level: scopeLevel ? parseInt(scopeLevel.toString()) : 0,
-            })
+            .update(updatePayload)
             .eq('id', id)
             .select()
             .single();
+
+        // Backward-compatibility: if the column does not exist yet, retry without it.
+        if (error && typeof eligibilityRules === 'string' && String((error as any).message || '').toLowerCase().includes('eligibility_rules')) {
+            const fallbackPayload = { ...updatePayload };
+            delete fallbackPayload.eligibility_rules;
+            const retry = await supabase
+                .from('elections')
+                .update(fallbackPayload)
+                .eq('id', id)
+                .select()
+                .single();
+            data = retry.data;
+            error = retry.error;
+        }
 
         if (error) throw error;
 

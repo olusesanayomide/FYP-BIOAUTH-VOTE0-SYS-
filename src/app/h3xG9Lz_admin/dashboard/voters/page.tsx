@@ -3,15 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  UserCheck, Search, Filter, Eye, X, Fingerprint, Shield, AlertTriangle,
-  Upload, RefreshCw, Ban, CheckCircle2, Clock, Smartphone, MapPin, Trash2, Play, Pause
+  UserCheck, Search, Eye, X, Shield, AlertTriangle,
+  Upload, RefreshCw, CheckCircle2, Clock, Smartphone, Trash2, Play, Pause
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import Cookies from "js-cookie";
 
 type BioStatus = "verified" | "not_enrolled" | "flagged";
 type VoteStatus = "voted" | "not_voted";
-type ViewMode = "list" | "enrollment" | "profile";
+type ViewMode = "list" | "profile";
 
 interface Voter {
   id: string;
@@ -44,6 +44,43 @@ const riskCfg: Record<string, { color: string; bg: string }> = {
   low: { color: "text-success", bg: "bg-success/10" },
   medium: { color: "text-warning", bg: "bg-warning/10" },
   high: { color: "text-destructive", bg: "bg-destructive/10" },
+};
+
+const formatDevice = (userAgent?: string | null): string => {
+  if (!userAgent) return "-";
+
+  const ua = userAgent.toLowerCase();
+
+  let browser = "Browser";
+  if (ua.includes("edg/")) browser = "Edge";
+  else if ((ua.includes("chrome/") || ua.includes("crios/")) && !ua.includes("edg/")) browser = "Chrome";
+  else if (ua.includes("firefox/") || ua.includes("fxios/")) browser = "Firefox";
+  else if (ua.includes("safari/") && !ua.includes("chrome/") && !ua.includes("crios/")) browser = "Safari";
+
+  let os = "Unknown OS";
+  if (ua.includes("windows")) os = "Windows";
+  else if (ua.includes("android")) os = "Android";
+  else if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ios")) os = "iOS";
+  else if (ua.includes("macintosh") || ua.includes("mac os x")) os = "macOS";
+  else if (ua.includes("linux")) os = "Linux";
+
+  const mobile = ua.includes("mobile") || ua.includes("android") || ua.includes("iphone");
+  return `${browser} on ${os}${mobile ? " (Mobile)" : ""}`;
+};
+
+const analyzeLoginPatterns = (loginHistory: { ip_address?: string | null; user_agent?: string | null }[]) => {
+  const ipSet = new Set(loginHistory.map((l) => l.ip_address).filter(Boolean));
+  const deviceSet = new Set(loginHistory.map((l) => formatDevice(l.user_agent)).filter((d) => d !== "-"));
+
+  const suspiciousActivity: string[] = [];
+  if (ipSet.size >= 3) suspiciousActivity.push("Multiple recent IP addresses detected.");
+  if (deviceSet.size >= 3) suspiciousActivity.push("Frequent device switching detected.");
+
+  let riskLevel: "low" | "medium" | "high" = "low";
+  if (ipSet.size >= 3 || deviceSet.size >= 3) riskLevel = "high";
+  else if (ipSet.size === 2 || deviceSet.size === 2) riskLevel = "medium";
+
+  return { riskLevel, suspiciousActivity };
 };
 
 const Voters = () => {
@@ -140,24 +177,34 @@ const Voters = () => {
       const res = await fetch(`${apiUrl}/admin/voters`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (data.success) {
-        setVoters(data.data.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          matricNo: u.matric_no,
-          email: u.email,
-          faculty: u.faculty || '—',
-          department: u.department || '—',
-          bioStatus: u.registration_completed ? 'verified' : 'not_enrolled',
-          voteStatus: u.has_voted ? 'voted' : 'not_voted',
-          device: '—',
-          lastLogin: u.last_voted_at ? new Date(u.last_voted_at).toLocaleString() : '—',
-          riskLevel: 'low',
-          bioEnrolledAt: u.registration_completed ? new Date(u.created_at).toLocaleString() : '—',
-          deviceHash: '—',
-          status: u.status || 'ACTIVE',
-          loginHistory: [],
-          suspiciousActivity: []
-        })));
+        setVoters(data.data.map((u: any) => {
+          const loginHistory = Array.isArray(u.login_history) ? u.login_history : [];
+          const lastLoginValue = u.last_login_at || u.last_voted_at;
+          const { riskLevel, suspiciousActivity } = analyzeLoginPatterns(loginHistory);
+
+          return {
+            id: u.id,
+            name: u.name,
+            matricNo: u.matric_no,
+            email: u.email,
+            faculty: u.faculty || '-',
+            department: u.department || '-',
+            bioStatus: u.registration_completed ? 'verified' : 'not_enrolled',
+            voteStatus: u.has_voted ? 'voted' : 'not_voted',
+            device: formatDevice(u.last_login_user_agent),
+            lastLogin: lastLoginValue ? new Date(lastLoginValue).toLocaleString() : '-',
+            riskLevel,
+            bioEnrolledAt: u.registration_completed ? new Date(u.created_at).toLocaleString() : '-',
+            deviceHash: u.last_login_ip || '-',
+            status: u.status || 'ACTIVE',
+            loginHistory: loginHistory.map((l: any) => ({
+              date: l.created_at ? new Date(l.created_at).toLocaleString() : '-',
+              ip: l.ip_address || '-',
+              device: formatDevice(l.user_agent)
+            })),
+            suspiciousActivity
+          };
+        }));
       }
     } catch (err) {
       console.error("Failed to fetch voters", err);
@@ -251,10 +298,6 @@ const Voters = () => {
                   className="admin-btn-secondary px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                 >
                   <Upload className="w-4 h-4" /> Import Students
-                </button>
-                <button onClick={() => setView("enrollment")}
-                  className="admin-btn-primary px-4 py-2.5 text-sm font-medium shadow-[0_8px_20px_-14px_hsl(var(--primary)/0.55)] transition-all duration-300 hover:scale-[1.01]">
-                  <RefreshCw className="w-4 h-4" /> Enrollment
                 </button>
                 </div>
               </div>
@@ -383,50 +426,6 @@ const Voters = () => {
           </motion.div>
         )}
 
-        {/* ENROLLMENT */}
-        {view === "enrollment" && (
-          <motion.div key="enrollment" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Upload className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold text-foreground">Voter Enrollment Management</h2>
-              </div>
-              <button onClick={() => setView("list")} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* CSV Import */}
-              <div className="admin-card rounded-xl p-6">
-                <h3 className="text-sm font-medium text-foreground mb-4">Import CSV File</h3>
-                <div className="h-40 rounded-lg border-2 border-dashed border-border/30 flex items-center justify-center cursor-pointer hover:border-primary/30 transition-colors">
-                  <div className="text-center">
-                    <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground">Drag & drop CSV file here</p>
-                    <p className="text-[10px] text-muted-foreground/50 mt-1">or click to browse</p>
-                  </div>
-                </div>
-                <p className="text-[10px] text-muted-foreground/50 mt-3">Columns: Name, Matric No., Email, Faculty, Department</p>
-              </div>
-
-              {/* Bulk Actions */}
-              <div className="admin-card rounded-xl p-6">
-                <h3 className="text-sm font-medium text-foreground mb-4">Bulk Actions</h3>
-                <div className="space-y-3">
-                  <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/30 border border-border/30 text-sm text-foreground hover:bg-muted/50 hover:border-primary/20 transition-all">
-                    <CheckCircle2 className="w-4 h-4 text-success" /> Approve Pending Accounts
-                  </button>
-                  <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/30 border border-border/30 text-sm text-foreground hover:bg-muted/50 hover:border-primary/20 transition-all">
-                    <RefreshCw className="w-4 h-4 text-primary" /> Trigger Biometric Re-verification
-                  </button>
-                  <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/30 border border-border/30 text-sm text-foreground hover:bg-muted/50 hover:border-destructive/20 transition-all">
-                    <Ban className="w-4 h-4 text-destructive" /> Suspend Selected Voters
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
         {/* PROFILE */}
         {view === "profile" && selected && (
           <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
@@ -470,7 +469,7 @@ const Voters = () => {
                     <span className="text-foreground text-xs">{selected.device}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Device Hash</span>
+                    <span className="text-muted-foreground">Last IP</span>
                     <span className="text-foreground text-xs font-mono">{selected.deviceHash}</span>
                   </div>
                   <div className="flex justify-between">
