@@ -18,6 +18,7 @@ interface TopNavNotification {
   type: "info" | "success" | "warning"
   time: string
   isRead: boolean
+  category: "election" | "results" | "system" | "verification"
 }
 
 export function TopNav({ onToggleSidebar }: TopNavProps) {
@@ -72,6 +73,21 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
       } catch (e) { }
     }
 
+    const getNotifPrefs = () => {
+      const fallback = { electionAlerts: true, resultAnnouncements: true }
+      const raw = localStorage.getItem('voter_notif_prefs')
+      if (!raw) return fallback
+      try {
+        const parsed = JSON.parse(raw)
+        return {
+          electionAlerts: parsed.electionAlerts !== false,
+          resultAnnouncements: parsed.resultAnnouncements !== false,
+        }
+      } catch {
+        return fallback
+      }
+    }
+
     const fetchNotifications = async () => {
       const items: TopNavNotification[] = []
       const now = new Date()
@@ -98,6 +114,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
               type: "success",
               time: "Now",
               isRead: false,
+              category: "election",
             })
           }
 
@@ -109,6 +126,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
               type: "info",
               time: "Upcoming",
               isRead: false,
+              category: "election",
             })
           }
         }
@@ -120,6 +138,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
           type: "warning",
           time: "Just now",
           isRead: false,
+          category: "system",
         })
       }
 
@@ -134,12 +153,20 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
               type: "warning",
               time: "Action needed",
               isRead: false,
+              category: "verification",
             })
           }
         } catch (e) { }
       }
 
-      if (items.length === 0) {
+      const prefs = getNotifPrefs()
+      const filtered = items.filter((n) => {
+        if (n.category === "election" && !prefs.electionAlerts) return false
+        if (n.category === "results" && !prefs.resultAnnouncements) return false
+        return true
+      })
+
+      if (filtered.length === 0) {
         items.push({
           id: "all-clear",
           title: "No new alerts",
@@ -147,10 +174,11 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
           type: "info",
           time: "Now",
           isRead: true,
+          category: "system",
         })
       }
 
-      setNotifications(items)
+      setNotifications(filtered.length > 0 ? filtered : items)
     }
 
     fetchSettings()
@@ -290,20 +318,6 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
                 <p className="text-[11px] text-muted-foreground truncate">{userEmail || "No email"}</p>
               </div>
               <button
-                onClick={() => openDashboardView("history")}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground hover:bg-muted/40 transition-colors"
-              >
-                <User className="h-4 w-4 text-primary" />
-                Voting History
-              </button>
-              <button
-                onClick={() => openDashboardView("settings")}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground hover:bg-muted/40 transition-colors"
-              >
-                <Settings className="h-4 w-4 text-primary" />
-                Account Settings
-              </button>
-              <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
@@ -314,13 +328,6 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
           )}
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="rounded-lg p-2 text-muted-foreground transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
-          aria-label="Logout"
-        >
-          <LogOut className="h-5 w-5" />
-        </button>
       </div>
     </header>
   )

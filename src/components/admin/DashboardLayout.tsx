@@ -53,6 +53,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
 
@@ -149,6 +150,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
       if (e.key === 'Escape') {
         setIsSearchOpen(false);
         setIsNotifOpen(false);
+        setIsProfileOpen(false);
       }
     };
 
@@ -221,15 +223,6 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
           })}
         </nav>
 
-        <div className="p-4 border-t border-border/30">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-destructive/25 text-destructive hover:bg-destructive/10 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Secure Logout</span>
-          </button>
-        </div>
       </motion.aside>
 
       {/* Main content */}
@@ -253,10 +246,6 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 mr-4 px-2.5 py-1 rounded-full border border-success/20 bg-success/10">
-              <div className="w-2 h-2 rounded-full bg-success animate-pulse-glow" />
-              <span className="text-[11px] text-success/90 tracking-wider font-medium">SYSTEM ONLINE</span>
-            </div>
             <ThemeToggle />
             <button
               onClick={() => setIsSearchOpen(true)}
@@ -270,6 +259,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
                 onClick={() => {
                   setIsNotifOpen((prev) => !prev);
                   setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                  setIsProfileOpen(false);
                 }}
                 className="w-8 h-8 rounded-lg border border-transparent flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50 transition-all duration-300 relative"
                 title="Notifications"
@@ -330,8 +320,45 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
                 )}
               </AnimatePresence>
             </div>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ml-2 text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(270, 91%, 65%))" }}>
-              A
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsProfileOpen((prev) => !prev);
+                  setIsNotifOpen(false);
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ml-2 text-primary-foreground"
+                style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(270, 91%, 65%))" }}
+                title="Account"
+              >
+                A
+              </button>
+              <AnimatePresence>
+                {isProfileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    className="absolute right-0 mt-2 w-[220px] admin-card rounded-xl p-2 z-[120]"
+                  >
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        navigateTo("/h3xG9Lz_admin/dashboard/settings");
+                      }}
+                      className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-foreground hover:bg-muted/40 transition-colors"
+                    >
+                      Settings
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-2"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Secure Logout
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.header>

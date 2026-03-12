@@ -10,11 +10,21 @@ export function SettingsView() {
   // Notification States
   const [notifState, setNotifState] = useState({
     electionAlerts: true,
-    resultAnnouncements: true,
-    systemUpdates: false
+    resultAnnouncements: true
   });
 
   useEffect(() => {
+    const storedPrefs = localStorage.getItem('voter_notif_prefs');
+    if (storedPrefs) {
+      try {
+        const parsed = JSON.parse(storedPrefs);
+        setNotifState({
+          electionAlerts: parsed.electionAlerts !== false,
+          resultAnnouncements: parsed.resultAnnouncements !== false
+        });
+      } catch (e) { }
+    }
+
     const loadUser = async () => {
       // First try localStorage for immediate UI
       const storedUser = localStorage.getItem('user');
@@ -50,7 +60,11 @@ export function SettingsView() {
   };
 
   const handleToggle = (key: keyof typeof notifState) => {
-    setNotifState(prev => ({ ...prev, [key]: !prev[key] }));
+    setNotifState(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('voter_notif_prefs', JSON.stringify(next));
+      return next;
+    });
   };
 
   const settingsGroups = [
@@ -77,7 +91,6 @@ export function SettingsView() {
       items: [
         { label: "Election Alerts", key: 'electionAlerts', value: notifState.electionAlerts ? "On" : "Off", isToggle: true },
         { label: "Result Announcements", key: 'resultAnnouncements', value: notifState.resultAnnouncements ? "On" : "Off", isToggle: true },
-        { label: "System Updates", key: 'systemUpdates', value: notifState.systemUpdates ? "On" : "Off", isToggle: true },
       ],
     },
     {

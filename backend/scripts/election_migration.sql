@@ -22,7 +22,8 @@ ADD COLUMN IF NOT EXISTS scope_level INT DEFAULT 0, -- 0 means 'All', otherwise 
 ADD COLUMN IF NOT EXISTS voting_method VARCHAR(50) DEFAULT 'Single Choice',
 ADD COLUMN IF NOT EXISTS max_votes INT DEFAULT 1,
 ADD COLUMN IF NOT EXISTS biometric_enforced BOOLEAN DEFAULT TRUE,
-ADD COLUMN IF NOT EXISTS real_time_monitoring BOOLEAN DEFAULT TRUE;
+ADD COLUMN IF NOT EXISTS real_time_monitoring BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS results_published BOOLEAN DEFAULT FALSE;
 
 -- 4. Sample updates to existing dummy users (for testing)
 UPDATE school_students 

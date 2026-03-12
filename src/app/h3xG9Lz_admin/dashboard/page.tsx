@@ -90,7 +90,7 @@ const Dashboard = () => {
             <p className="text-2xl font-semibold text-primary">
               {!isLoadingStats ? <AnimatedCounter target={stats.adminsOnline} duration={800} /> : "-"}
             </p>
-            <p className="admin-kpi mt-1">ADMINS ONLINE</p>
+            <p className="admin-kpi mt-1">ADMINS ONLINE (15m)</p>
           </div>
           <div className="w-px h-10 bg-border/30" />
           <div className="text-center">

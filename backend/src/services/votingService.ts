@@ -525,6 +525,14 @@ export const getVotingResults = async (electionId: string) => {
     throw new ApiError(404, 'Election not found', 'ELECTION_NOT_FOUND');
   }
 
+  const now = new Date();
+  const endTime = election.end_time ? new Date(election.end_time) : null;
+  const isEnded = endTime ? now > endTime : false;
+  const isPublished = election.results_published === true;
+  if (!isPublished && !isEnded) {
+    throw new ApiError(403, 'Results are not available yet', 'RESULTS_NOT_PUBLISHED');
+  }
+
   const positionsMap = new Map();
   (election.candidates || []).forEach((c: any) => {
     const posName = c.position || 'General';

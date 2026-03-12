@@ -356,7 +356,7 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
                 <div className="mt-10 flex justify-end">
                   <button
                     onClick={handleSubmitVote}
-                    disabled={isSubmitting || Object.keys(selectedCandidates).length !== (election.positions?.length || 0)}
+                    disabled={isSubmitting || Object.keys(selectedCandidates).length === 0}
                     className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-10 py-3.5 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(139,92,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? (

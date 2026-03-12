@@ -9,13 +9,14 @@ import * as XLSX from 'xlsx';
  */
 export const getDashboardStats = async () => {
     try {
-        // 1. Admins Online (Approximated as total admin accounts for now, or based on last_login_at)
-        // For simplicity of "Admins", we will get the exact total count of configured admins in the DB.
-        // If you explicitly wanted "online", we'd check active sessions, but usually this metric means Total Admins or active today.
-        // Let's go with Total Admins for robustness.
+        // 1. Admins Online
+        // We approximate "online" as admins who logged in within the last 15 minutes.
+        const onlineWindowMs = 15 * 60 * 1000;
+        const onlineCutoff = new Date(Date.now() - onlineWindowMs).toISOString();
         const { count: totalAdmins, error: adminError } = await supabase
             .from('admin')
-            .select('*', { count: 'exact', head: true });
+            .select('*', { count: 'exact', head: true })
+            .gte('last_login_at', onlineCutoff);
 
         if (adminError) throw adminError;
 
@@ -896,6 +897,44 @@ export const updateElectionStatus = async (id: string, status: string, adminId: 
     } catch (error: any) {
         console.error('Error updating election status:', error);
         throw new ApiError(500, 'Failed to update election status', 'DATABASE_ERROR');
+    }
+};
+
+/**
+ * Publishes or hides election results
+ */
+export const updateElectionResultsVisibility = async (id: string, publish: boolean, adminId: string) => {
+    try {
+        const { data, error } = await supabase
+            .from('elections')
+            .update({ results_published: publish })
+            .eq('id', id)
+            .select('id, title, results_published')
+            .single();
+
+        if (error) throw error;
+
+        await supabase.from('audit_logs').insert({
+            action: publish ? 'ELECTION_RESULTS_PUBLISHED' : 'ELECTION_RESULTS_HIDDEN',
+            resource_type: 'ELECTION',
+            resource_id: data.id,
+            admin_id: adminId,
+            status: 'SUCCESS',
+            details: JSON.stringify({
+                title: data.title,
+                publish,
+                description: publish ? `Published results for election ${data.title}` : `Hid results for election ${data.title}`
+            })
+        });
+
+        return {
+            success: true,
+            message: publish ? 'Election results published' : 'Election results hidden',
+            data
+        };
+    } catch (error: any) {
+        console.error('Error updating election results visibility:', error);
+        throw new ApiError(500, 'Failed to update election results visibility', 'DATABASE_ERROR');
     }
 };
 

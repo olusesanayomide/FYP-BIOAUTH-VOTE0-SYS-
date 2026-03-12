@@ -92,6 +92,15 @@ const Candidates = () => {
     fetchInitialData();
   }, []);
 
+  const safeJson = async (res: Response) => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { success: false, error: text || "Non-JSON response" };
+    }
+  };
+
   const fetchInitialData = async () => {
     setIsLoading(true);
     try {
@@ -99,14 +108,14 @@ const Candidates = () => {
 
       // Fetch Elections
       const elRes = await fetch(`${apiUrl}/admin/elections`, { headers: getAuthHeaders() });
-      const elData = await elRes.json();
+      const elData = await safeJson(elRes);
       if (elData.success) {
         setElectionsConfig(elData.data.map((e: any) => ({ id: e.id, name: e.title })));
       }
 
       // Fetch Candidates
       const candRes = await fetch(`${apiUrl}/admin/candidates`, { headers: getAuthHeaders() });
-      const candData = await candRes.json();
+      const candData = await safeJson(candRes);
       if (candData.success) {
         setCandidates(candData.data.map((dbCand: any) => ({
           id: dbCand.id,
@@ -201,7 +210,7 @@ const Candidates = () => {
         })
       });
 
-      const data = await response.json();
+      const data = await safeJson(response);
       if (!response.ok || !data.success) {
         throw new Error(data.error || data.message || "Failed to add candidate");
       }
@@ -238,7 +247,8 @@ const Candidates = () => {
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ status: newStatus })
       });
-      if (!response.ok) throw new Error("Failed to update status");
+      const data = await safeJson(response);
+      if (!response.ok || !data.success) throw new Error(data.error || data.message || "Failed to update status");
 
       // Update local state without full refetch for crisp UI feel
       setCandidates(prev => prev.map(c => {
@@ -288,7 +298,8 @@ const Candidates = () => {
         method: "DELETE",
         headers: getAuthHeaders()
       });
-      if (!response.ok) throw new Error("Failed to delete candidate");
+      const data = await safeJson(response);
+      if (!response.ok || !data.success) throw new Error(data.error || data.message || "Failed to delete candidate");
 
       // Remove local copy
       setCandidates(prev => prev.filter(c => c.id !== id));
@@ -318,9 +329,10 @@ const Candidates = () => {
                 <Users className="w-5 h-5 text-primary" />
                 <h2 className="text-xl font-semibold text-foreground">Candidates</h2>
               </div>
-              <button onClick={() => setView("add")}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-[1.02]"
-                style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(187, 80%, 40%))", color: "#0B0E14", boxShadow: "0 0 20px hsla(187,100%,50%,0.15)" }}>
+              <button
+                onClick={() => setView("add")}
+                className="admin-btn-primary px-4 py-2.5 text-sm font-medium shadow-[0_8px_20px_-14px_hsl(var(--primary)/0.55)]"
+              >
                 <Plus className="w-4 h-4" /> Add Candidate
               </button>
             </div>
@@ -539,9 +551,11 @@ const Candidates = () => {
 
               <div className="flex gap-3 mt-8 pt-6 border-t border-border/20">
                 <button onClick={() => setView("list")} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
-                <button onClick={handleCreateSubmit} disabled={isSubmitting}
-                  className="px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
-                  style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(187, 80%, 40%))", color: "#0B0E14", boxShadow: "0 0 20px hsla(187,100%,50%,0.15)" }}>
+                <button
+                  onClick={handleCreateSubmit}
+                  disabled={isSubmitting}
+                  className="admin-btn-primary px-6 py-2.5 text-sm font-medium transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
+                >
                   {isSubmitting ? "Adding..." : "Add Candidate"}
                 </button>
               </div>

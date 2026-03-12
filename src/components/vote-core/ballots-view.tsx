@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Calendar, Building2, ArrowRight, Loader2 } from "lucide-react"
 import { getElections, Election } from "@/services/votingService"
+import { getCurrentUser } from "@/services/authService"
 import { format } from "date-fns"
 import { ElectionCard } from "./election-card"
 
@@ -38,9 +39,16 @@ export function BallotsView() {
       try { setUser(JSON.parse(storedUser)); } catch (e) { }
     }
     const loadData = async () => {
-      const resp = await getElections();
-      if (resp.success && resp.data) {
-        setElections(resp.data);
+      const [electionsResp, userResp] = await Promise.all([
+        getElections(),
+        getCurrentUser()
+      ]);
+      if (electionsResp.success && electionsResp.data) {
+        setElections(electionsResp.data);
+      }
+      if (userResp.success && userResp.data) {
+        setUser(userResp.data);
+        localStorage.setItem('user', JSON.stringify(userResp.data));
       }
       setLoading(false);
     };
@@ -80,7 +88,7 @@ export function BallotsView() {
             <ElectionCard
               key={ballot.id}
               election={ballot}
-              isVerified={user?.registration_completed}
+              isVerified={user?.registrationCompleted ?? user?.registration_completed}
             />
           ))}
         </div>

@@ -3,6 +3,7 @@
 import {
   LayoutDashboard,
   Vote,
+  BarChart3,
   ShieldCheck,
   History,
   Settings,
@@ -14,6 +15,7 @@ const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "ballots", label: "My Ballots", icon: Vote },
   { id: "verification", label: "Verification Status", icon: ShieldCheck },
+  { id: "results", label: "Results", icon: BarChart3 },
   { id: "history", label: "Voting History", icon: History },
   { id: "settings", label: "Settings", icon: Settings },
 ]

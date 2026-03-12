@@ -30,6 +30,7 @@ interface Election {
   verifiedBiometric: number;
   votesCast: number;
   fraudAlerts: number;
+  resultsPublished: boolean;
 }
 
 // Dynamic fetching prevents using hardcoded mocks
@@ -67,6 +68,8 @@ const Elections = () => {
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [showSuspendConfirm, setShowSuspendConfirm] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -126,6 +129,7 @@ const Elections = () => {
             verifiedBiometric: dbElection.verifiedBiometric || 0,
             votesCast: dbElection.votesCast || 0,
             fraudAlerts: dbElection.fraudAlerts || 0,
+            resultsPublished: dbElection.results_published === true,
           };
         });
         setElections(mappedData);
@@ -252,15 +256,40 @@ const Elections = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to completely delete the election: ${name}? All associated data will be lost.`)) return;
+    setDeleteTarget({ id, name });
+    setShowDeleteConfirm(true);
+  };
+
+  const handleResultsPublish = async (id: string, publish: boolean) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/elections/${id}`, {
+      const response = await fetch(`${apiUrl}/admin/elections/${id}/results`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ results_published: publish })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || data.message || "Failed to update results visibility");
+
+      setElections(prev => prev.map(e => e.id === id ? { ...e, resultsPublished: publish } : e));
+      setSelectedElection(prev => prev?.id === id ? { ...prev, resultsPublished: publish } : prev);
+    } catch (error) {
+      console.error("Failed to update results visibility", error);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/admin/elections/${deleteTarget.id}`, {
         method: "DELETE",
         headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error("Failed to delete election");
       fetchElections();
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
     } catch (error) {
       console.error(error);
       alert("Failed to delete election");
@@ -450,6 +479,28 @@ const Elections = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Delete confirmation overlay */}
+            <AnimatePresence>
+              {showDeleteConfirm && deleteTarget && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                  <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="admin-card rounded-2xl p-8 max-w-md w-full mx-4 border border-destructive/20">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Trash className="w-5 h-5 text-destructive" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">Delete Election</h3>
+                        <p className="text-xs text-muted-foreground">{deleteTarget.name}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-6">This will permanently delete this election and all associated data. This action cannot be undone.</p>
+                    <div className="flex gap-3 justify-end">
+                      <button onClick={() => { setShowDeleteConfirm(false); setDeleteTarget(null); }} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all">Cancel</button>
+                      <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all">Delete Election</button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 
@@ -622,13 +673,22 @@ const Elections = () => {
                   {statusConfig[selectedElection.status].label}
                 </span>
               </div>
-              {selectedElection.status === "ongoing" && (
-                <div className="flex gap-2">
+              <div className="flex gap-2">
+                {selectedElection.status === "ongoing" && (
                   <button onClick={() => setShowSuspendConfirm(selectedElection.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-warning bg-warning/5 hover:bg-warning/10 border border-warning/20 transition-all">
                     <PauseCircle className="w-4 h-4" /> Suspend
                   </button>
-                </div>
-              )}
+                )}
+                <button
+                  onClick={() => handleResultsPublish(selectedElection.id, !selectedElection.resultsPublished)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all ${selectedElection.resultsPublished
+                    ? "text-muted-foreground bg-muted/30 border-border/40 hover:bg-muted/40"
+                    : "text-primary bg-primary/5 border-primary/20 hover:bg-primary/10"
+                    }`}
+                >
+                  {selectedElection.resultsPublished ? "Hide Results" : "Publish Results"}
+                </button>
+              </div>
             </div>
 
             {/* Overview stats */}
@@ -693,6 +753,12 @@ const Elections = () => {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Integrity Status</span>
                     <span className={selectedElection.fraudAlerts === 0 ? "text-success" : "text-warning"}>{selectedElection.fraudAlerts === 0 ? "Clean" : "Under Review"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Results Visibility</span>
+                    <span className={selectedElection.resultsPublished ? "text-success" : "text-muted-foreground"}>
+                      {selectedElection.resultsPublished ? "Published" : "Hidden"}
+                    </span>
                   </div>
                 </div>
 

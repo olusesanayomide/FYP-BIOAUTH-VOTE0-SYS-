@@ -151,12 +151,7 @@ export default function CandidateProfile() {
     };
 
     return (
-        <div
-            className="relative min-h-screen"
-            style={{
-                background: "radial-gradient(circle at 20% 20%, #111827, #0B0F1A)",
-            }}
-        >
+        <div className="relative min-h-screen bg-background text-foreground">
             <TopNav onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
             <Sidebar
                 activeView="dashboard"
@@ -170,8 +165,14 @@ export default function CandidateProfile() {
                     <motion.button
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        onClick={() => router.push("/dashboard")}
-                        className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group mb-8"
+                        onClick={() => {
+                            if (typeof window !== "undefined" && window.history.length > 1) {
+                                router.back();
+                            } else {
+                                router.push("/dashboard");
+                            }
+                        }}
+                        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group mb-8"
                     >
                         <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
                         <span className="font-medium">Back to Dashboard</span>
@@ -188,13 +189,13 @@ export default function CandidateProfile() {
                             <motion.div
                                 initial={{ opacity: 0, y: 30 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="glass-card rounded-[2rem] p-8 md:p-12 relative overflow-hidden flex flex-col md:flex-row items-center md:items-start gap-10 border border-white/5 shadow-2xl"
+                                className="glass-card rounded-[2rem] p-8 md:p-12 relative overflow-hidden flex flex-col md:flex-row items-center md:items-start gap-10 border border-border/40 shadow-2xl"
                             >
                                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-transparent z-0" />
 
                                 {/* Profile Image with Status Glow */}
                                 <div className="relative z-10 shrink-0">
-                                    <div className="relative w-40 h-40 md:w-56 md:h-56 rounded-3xl overflow-hidden border-4 border-white/10 shadow-2xl">
+                                    <div className="relative w-40 h-40 md:w-56 md:h-56 rounded-3xl overflow-hidden border-4 border-border/50 shadow-2xl">
                                         {candidate.imageUrl ? (
                                             <img src={candidate.imageUrl} alt={candidate.name} className="w-full h-full object-cover" />
                                         ) : (
@@ -203,8 +204,8 @@ export default function CandidateProfile() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="absolute -bottom-4 -right-4 w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg border-4 border-[#0B0F1A]">
-                                        <Shield className="w-6 h-6 text-white" />
+                                    <div className="absolute -bottom-4 -right-4 w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg border-4 border-background">
+                                        <Shield className="w-6 h-6 text-primary-foreground" />
                                     </div>
                                 </div>
 
@@ -216,37 +217,37 @@ export default function CandidateProfile() {
                                                 Certified Candidate
                                             </span>
                                             {candidate.party && (
-                                                <span className="px-4 py-1.5 rounded-xl bg-white/5 text-white/50 text-[10px] uppercase tracking-widest font-bold border border-white/10">
+                                                <span className="px-4 py-1.5 rounded-xl bg-muted/30 text-muted-foreground text-[10px] uppercase tracking-widest font-bold border border-border/40">
                                                     {candidate.party}
                                                 </span>
                                             )}
                                         </div>
-                                        <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white leading-tight">
+                                        <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-foreground leading-tight">
                                             {candidate.name}
                                         </h1>
                                     </div>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-4 border-t border-white/5">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-4 border-t border-border/40">
                                         <div className="space-y-1">
                                             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5">
                                                 <Layout className="w-3 h-3 text-primary" />
                                                 Running For
                                             </p>
-                                            <p className="text-sm font-bold text-white">{candidate.positionTitle}</p>
+                                            <p className="text-sm font-bold text-foreground">{candidate.positionTitle}</p>
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5">
                                                 <Building className="w-3 h-3 text-primary" />
                                                 Department
                                             </p>
-                                            <p className="text-sm font-bold text-white">{candidate.department || "General Administration"}</p>
+                                            <p className="text-sm font-bold text-foreground">{candidate.department || "General Administration"}</p>
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5">
                                                 <GraduationCap className="w-3 h-3 text-primary" />
                                                 Level
                                             </p>
-                                            <p className="text-sm font-bold text-white">{candidate.level ? `${candidate.level} Level` : "Final Year"}</p>
+                                            <p className="text-sm font-bold text-foreground">{candidate.level ? `${candidate.level} Level` : "Final Year"}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -260,23 +261,23 @@ export default function CandidateProfile() {
                                     transition={{ delay: 0.2 }}
                                     className="lg:col-span-2 space-y-10"
                                 >
-                                    <div className="glass-card rounded-[2rem] p-8 md:p-12 border border-white/5 space-y-8">
-                                        <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                                    <div className="glass-card rounded-[2rem] p-8 md:p-12 border border-border/40 space-y-8">
+                                        <h3 className="text-2xl font-bold text-foreground flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
                                                 <User className="w-5 h-5 text-primary" />
                                             </div>
                                             Biography & Vision
                                         </h3>
 
-                                        <div className="prose prose-invert max-w-none text-slate-300 leading-relaxed text-lg whitespace-pre-line font-medium">
+                                        <div className="prose max-w-none text-muted-foreground leading-relaxed text-lg whitespace-pre-line font-medium">
                                             {candidate.platform || "This candidate is dedicated to fostering a more inclusive and technologically advanced student body. With a focus on transparency, innovation, and direct student representation, they aim to bridge the gap between administration and the student collective."}
                                         </div>
                                     </div>
 
                                     {candidate.manifestoUrl && (
-                                        <div className="glass-card rounded-[2rem] p-8 border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                                        <div className="glass-card rounded-[2rem] p-8 border border-border/40 flex flex-col md:flex-row items-center justify-between gap-6">
                                             <div className="space-y-1">
-                                                <h4 className="text-lg font-bold text-white">Candidate Manifesto</h4>
+                                                <h4 className="text-lg font-bold text-foreground">Candidate Manifesto</h4>
                                                 <p className="text-sm text-muted-foreground">Official policy document and strategic blueprint.</p>
                                             </div>
                                             <a
@@ -302,13 +303,13 @@ export default function CandidateProfile() {
                                 >
                                     <div className="glass-card rounded-[2rem] p-8 border border-primary/20 bg-primary/5 space-y-8 sticky top-[100px]">
                                         <div className="space-y-3">
-                                            <h3 className="text-xl font-bold text-white">Official Ballot</h3>
+                                            <h3 className="text-xl font-bold text-foreground">Official Ballot</h3>
                                             <p className="text-xs text-muted-foreground leading-relaxed">
                                                 Your vote is encrypted and securely cast using end-to-end biometric verification.
                                             </p>
                                         </div>
 
-                                        <div className="space-y-4 pt-4 border-t border-white/10">
+                                        <div className="space-y-4 pt-4 border-t border-border/40">
                                             {eligibility?.hasVoted ? (
                                                 <div className="space-y-4">
                                                     <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-4">
@@ -346,7 +347,7 @@ export default function CandidateProfile() {
                                                     <button
                                                         onClick={handleCastVote}
                                                         disabled={isVoting || election?.status !== 'active'}
-                                                        className="w-full flex items-center justify-center gap-4 py-6 rounded-2xl bg-primary text-[#0B0E14] font-black text-lg transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(139,92,246,0.3)] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group"
+                                                        className="w-full flex items-center justify-center gap-4 py-6 rounded-2xl bg-primary text-primary-foreground font-black text-lg transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(139,92,246,0.3)] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group"
                                                     >
                                                         {isVoting ? (
                                                             <Loader2 className="w-6 h-6 animate-spin" />
@@ -373,21 +374,21 @@ export default function CandidateProfile() {
                             </div>
                         </div>
                     ) : (
-                        <div className="glass-card rounded-[2rem] p-20 text-center border-dashed border-white/10">
-                            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
-                                <User className="w-10 h-10 text-white/20" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-white mb-2">Secure Module Error</h3>
-                            <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-8">
-                                The requested candidate credentials could not be decrypted or the record no longer exists.
-                            </p>
-                            <button
-                                onClick={() => router.push("/dashboard")}
-                                className="px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all"
-                            >
-                                Return to Secure Portal
-                            </button>
-                        </div>
+                                            <div className="glass-card rounded-[2rem] p-20 text-center border-dashed border-border/40">
+                                                <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-6">
+                                                    <User className="w-10 h-10 text-muted-foreground/50" />
+                                                </div>
+                                                <h3 className="text-2xl font-bold text-foreground mb-2">Secure Module Error</h3>
+                                                <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-8">
+                                                    The requested candidate credentials could not be decrypted or the record no longer exists.
+                                                </p>
+                                                <button
+                                                    onClick={() => router.push("/dashboard")}
+                                                    className="px-8 py-3 rounded-xl bg-muted/30 border border-border/40 text-foreground text-sm font-bold hover:bg-muted/50 transition-all"
+                                                >
+                                                    Return to Secure Portal
+                                                </button>
+                                            </div>
                     )}
                 </div>
             </main>

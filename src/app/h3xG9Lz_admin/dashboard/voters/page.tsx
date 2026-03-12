@@ -101,6 +101,8 @@ const Voters = () => {
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -249,20 +251,27 @@ const Voters = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to permanently delete ${name}? This action cannot be undone.`)) return;
+    setDeleteTarget({ id, name });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${apiUrl}/admin/voters/${id}`, {
+      const res = await fetch(`${apiUrl}/admin/voters/${deleteTarget.id}`, {
         method: "DELETE",
         headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.success) {
-        setVoters(prev => prev.filter(v => v.id !== id));
-        if (selected?.id === id) {
+        setVoters(prev => prev.filter(v => v.id !== deleteTarget.id));
+        if (selected?.id === deleteTarget.id) {
           setView("list");
           setSelected(null);
         }
+        setShowDeleteModal(false);
+        setDeleteTarget(null);
       }
     } catch (err) {
       console.error("Failed to delete voter", err);
@@ -590,6 +599,46 @@ const Voters = () => {
                 className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deleteTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="admin-card max-w-md w-full p-6 border border-destructive/30"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Delete Voter</h3>
+                <p className="text-xs text-muted-foreground">{deleteTarget.name}</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-6">
+              This will permanently delete this voter and all associated records. This action cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
+                className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-xs font-medium rounded-lg bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/15 transition-all"
+              >
+                Delete Permanently
               </button>
             </div>
           </motion.div>

@@ -324,6 +324,25 @@ router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respons
         .eq('id', req.user.id)
         .single();
 
+      let lastLoginAt: string | null = null;
+      let lastLoginIp: string | null = null;
+      let lastLoginUserAgent: string | null = null;
+      if (voter) {
+        const { data: loginLogs } = await supabase
+          .from('audit_logs')
+          .select('created_at, ip_address, user_agent, action')
+          .eq('user_id', voter.id)
+          .in('action', ['WEBAUTHN_LOGIN_SUCCESS', 'LOGIN_OTP_SUCCESS'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (loginLogs && loginLogs[0]) {
+          lastLoginAt = loginLogs[0].created_at || null;
+          lastLoginIp = loginLogs[0].ip_address || null;
+          lastLoginUserAgent = loginLogs[0].user_agent || null;
+        }
+      }
+
       user = voter ? {
         id: voter.id,
         email: voter.email,
@@ -331,7 +350,10 @@ router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respons
         name: voter.name,
         role: voter.role,
         biometricStatus: voter.biometric_status,
-        registrationCompleted: voter.registration_completed
+        registrationCompleted: voter.registration_completed,
+        last_login_at: lastLoginAt,
+        last_login_ip: lastLoginIp,
+        last_login_user_agent: lastLoginUserAgent
       } : null;
       queryError = error;
     }
