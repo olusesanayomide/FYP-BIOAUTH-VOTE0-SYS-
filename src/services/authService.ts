@@ -332,7 +332,7 @@ export const isLoggedIn = (): boolean => {
 };
 
 /**
- * Get current user profile and session status
+ * Check if current user profile exists
  */
 export const getCurrentUser = async (): Promise<ApiResponse<any>> => {
   try {
@@ -342,6 +342,81 @@ export const getCurrentUser = async (): Promise<ApiResponse<any>> => {
     return {
       success: false,
       error: error.response?.data?.error || 'Failed to fetch user profile',
+    };
+  }
+};
+
+/**
+ * Check if admin is registered for webauthn
+ */
+export const checkAdminStatus = async (email: string): Promise<ApiResponse<{ adminId: string, isRegistered: boolean }>> => {
+  try {
+    const response = await apiClient.post('/auth/admin/status', { email });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Failed to check admin status',
+    };
+  }
+};
+
+/**
+ * Get Admin WebAuthn authentication options
+ */
+export const getAdminAuthenticationOptions = async (adminId: string): Promise<ApiResponse<WebAuthnAuthOptions>> => {
+  try {
+    const response = await apiClient.post('/auth/admin/webauthn/authentication-options', { adminId });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Failed to get authentication options',
+    };
+  }
+};
+
+/**
+ * Verify Admin WebAuthn authentication
+ */
+export const verifyAdminAuthentication = async (adminId: string, credential: any): Promise<ApiResponse> => {
+  try {
+    const response = await apiClient.post('/auth/admin/webauthn/verify-authentication', { adminId, response: credential });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Biometric verification failed',
+    };
+  }
+};
+
+/**
+ * Request Admin OTP for login (fallback)
+ */
+export const requestAdminOtp = async (adminId: string): Promise<ApiResponse> => {
+  try {
+    const response = await apiClient.post('/auth/admin/login/request-otp', { adminId });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Failed to request OTP',
+    };
+  }
+};
+
+/**
+ * Verify Admin OTP for login
+ */
+export const verifyAdminOtp = async (adminId: string, otp: string): Promise<ApiResponse> => {
+  try {
+    const response = await apiClient.post('/auth/admin/login/verify-otp', { adminId, otp });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'OTP verification failed',
     };
   }
 };
