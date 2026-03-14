@@ -23,7 +23,7 @@ const HeroSection = () => {
       <div className="relative z-10 max-w-7xl mx-auto w-full px-6 py-24 md:py-28">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.08] max-w-[22ch] mx-auto">
-            {"Secured by Your Identity".split(" ").map((word, i) => (
+            {"Secured By Your Identity".split(" ").map((word, i) => (
               <motion.span
                 key={i}
                 initial={{ opacity: 0, y: 20 }}

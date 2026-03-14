@@ -1,7 +1,7 @@
 "use client"
 
 import { Calendar, Building2, ArrowRight, CheckCircle2, AlertCircle, Loader2, Clock } from "lucide-react"
-import { Election, submitVote } from "@/services/votingService"
+import { Election, checkVotingEligibility, submitVote } from "@/services/votingService"
 import { format } from "date-fns"
 import { useState, useEffect } from "react"
 
@@ -60,11 +60,35 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
     return () => clearInterval(timer);
   }, [election]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadEligibility = async () => {
+      try {
+        const resp = await checkVotingEligibility(election.id);
+        if (!isMounted) return;
+        if (resp.success && resp.data) {
+          setHasVoted(!!resp.data.hasVoted);
+          setEligibilityMessage(resp.data.message || "");
+        }
+      } catch {
+        // Ignore eligibility errors to avoid blocking UI rendering
+      }
+    };
+
+    loadEligibility();
+    return () => {
+      isMounted = false;
+    };
+  }, [election.id]);
+
   const [isVoting, setIsVoting] = useState(false);
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [eligibilityMessage, setEligibilityMessage] = useState("");
 
   const formatDateRange = () => {
     try {
@@ -93,6 +117,11 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
   };
 
   const handleSubmitVote = async () => {
+    if (hasVoted) {
+      setSubmitError("You have already voted in this election.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
 
@@ -145,6 +174,7 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
       const result = await submitVote(submission);
       if (result.success) {
         setSubmitSuccess(true);
+        setHasVoted(true);
       } else {
         setSubmitError(result.error || "Failed to submit vote. You may have already voted.");
       }
@@ -226,11 +256,12 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
             canVote ? (
               <button
                 onClick={() => setIsVoting(true)}
-                className="group flex items-center justify-center gap-4 rounded-2xl bg-primary px-8 py-5 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] shadow-md flex-shrink-0"
+                disabled={hasVoted}
+                className="group flex items-center justify-center gap-4 rounded-2xl bg-primary px-8 py-5 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] shadow-md flex-shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <div className="flex flex-col items-center leading-snug text-left">
-                  <span>Cast Your</span>
-                  <span>Vote</span>
+                  <span>{hasVoted ? "Vote" : "Cast Your"}</span>
+                  <span>{hasVoted ? "Recorded" : "Vote"}</span>
                 </div>
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </button>
@@ -271,10 +302,10 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
               </button>
             </div>
 
-            {submitError && (
+            {(submitError || (hasVoted && eligibilityMessage)) && (
               <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex gap-3 items-center">
                 <AlertCircle className="h-5 w-5 text-destructive font-medium" />
-                <p className="text-sm text-destructive">{submitError}</p>
+                <p className="text-sm text-destructive">{submitError || eligibilityMessage}</p>
               </div>
             )}
 
@@ -356,7 +387,7 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
                 <div className="mt-10 flex justify-end">
                   <button
                     onClick={handleSubmitVote}
-                    disabled={isSubmitting || Object.keys(selectedCandidates).length === 0}
+                    disabled={hasVoted || isSubmitting || Object.keys(selectedCandidates).length === 0}
                     className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-10 py-3.5 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(139,92,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? (

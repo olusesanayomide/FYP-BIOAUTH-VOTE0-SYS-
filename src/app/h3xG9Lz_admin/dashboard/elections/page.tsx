@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -194,7 +194,7 @@ const Elections = () => {
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({...formData, startDate: new Date(formData.startDate).toISOString(), endDate: new Date(formData.endDate).toISOString()}),
       });
 
       const data = await response.json();
@@ -321,7 +321,7 @@ const Elections = () => {
   return (
     <DashboardLayout breadcrumb={["Elections"]}>
       <AnimatePresence mode="wait">
-        {/* ───── LIST VIEW ───── */}
+        {/* â”€â”€â”€â”€â”€ LIST VIEW â”€â”€â”€â”€â”€ */}
         {view === "list" && (
           <motion.div key="list" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
             {/* Header */}
@@ -407,7 +407,7 @@ const Elections = () => {
                           <span className="text-[10px] text-muted-foreground">{el.id}</span>
                         </div>
                         <h4 className="text-sm font-medium text-foreground mb-1">{el.name}</h4>
-                        <p className="text-xs text-muted-foreground mb-3">{el.type} • {el.scope}</p>
+                        <p className="text-xs text-muted-foreground mb-3">{el.type} â€¢ {el.scope}</p>
                         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-4">
                           <span>Start: {el.startDate}</span>
                           <span>End: {el.endDate}</span>
@@ -423,7 +423,7 @@ const Elections = () => {
                             transition={{ duration: 1.2, ease: "easeOut" }}
                           />
                         </div>
-                        <p className="text-[10px] text-muted-foreground">{progress}% turnout • {el.votesCast.toLocaleString()} votes cast</p>
+                        <p className="text-[10px] text-muted-foreground">{progress}% turnout â€¢ {el.votesCast.toLocaleString()} votes cast</p>
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/20">
@@ -504,7 +504,7 @@ const Elections = () => {
           </motion.div>
         )}
 
-        {/* ───── CREATE/EDIT VIEW ───── */}
+        {/* â”€â”€â”€â”€â”€ CREATE/EDIT VIEW â”€â”€â”€â”€â”€ */}
         {view === "create" && (
           <motion.div key="create" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
             <div className="flex items-center justify-between mb-6">
@@ -662,12 +662,12 @@ const Elections = () => {
           </motion.div>
         )}
 
-        {/* ───── DETAIL VIEW ───── */}
+        {/* â”€â”€â”€â”€â”€ DETAIL VIEW â”€â”€â”€â”€â”€ */}
         {view === "detail" && selectedElection && (
           <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <button onClick={() => setView("list")} className="text-muted-foreground hover:text-foreground transition-colors text-sm">← Back</button>
+                <button onClick={() => setView("list")} className="text-muted-foreground hover:text-foreground transition-colors text-sm">â† Back</button>
                 <h2 className="text-xl font-semibold text-foreground">{selectedElection.name}</h2>
                 <span className={`text-[10px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-full ${statusConfig[selectedElection.status].bg} ${statusConfig[selectedElection.status].color}`}>
                   {statusConfig[selectedElection.status].label}

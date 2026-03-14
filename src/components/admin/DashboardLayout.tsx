@@ -17,7 +17,7 @@ const menuItems = [
   { title: "Candidates", icon: Users, path: "/h3xG9Lz_admin/dashboard/candidates" },
   { title: "Voter Registry", icon: UserCheck, path: "/h3xG9Lz_admin/dashboard/voters" },
   { title: "Biometric Logs", icon: Fingerprint, path: "/h3xG9Lz_admin/dashboard/biometrics" },
-  { title: "Audit Trail", icon: FileText, path: "/h3xG9Lz_admin/dashboard/audit" },
+  { title: "Audit & Logs", icon: FileText, path: "/h3xG9Lz_admin/dashboard/audit" },
   { title: "AI Insights", icon: Brain, path: "/h3xG9Lz_admin/dashboard/ai" },
   { title: "Security Center", icon: ShieldAlert, path: "/h3xG9Lz_admin/dashboard/security" },
   { title: "Settings", icon: Settings, path: "/h3xG9Lz_admin/dashboard/settings" },
@@ -366,17 +366,17 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
         <main className="flex-1 p-6 lg:p-10">
           <div className="max-w-[1400px] mx-auto space-y-8">
             <AnimatePresence>
-            {pendingPath && (
-              <motion.div
-                className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] text-primary"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-              >
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Loading section...</span>
-              </motion.div>
-            )}
+              {pendingPath && (
+                <motion.div
+                  className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] text-primary"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                >
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Loading section...</span>
+                </motion.div>
+              )}
             </AnimatePresence>
             {children}
           </div>

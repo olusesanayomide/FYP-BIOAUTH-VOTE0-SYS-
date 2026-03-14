@@ -258,19 +258,38 @@ export const checkVotingEligibility = async (userId: string, electionId: string)
   }
 
   // Check if user has already voted
-  const { data: existingVote } = await supabase
+  const { data: existingRecord, error: existingRecordError } = await supabase
     .from('voter_records')
-    .select('*')
+    .select('id')
     .eq('user_id', userId)
     .eq('election_id', electionId)
-    .single();
+    .limit(1);
 
-  if (existingVote) {
-    throw new ApiError(
-      409,
-      'You have already voted in this election. Double voting is not permitted.',
-      'ALREADY_VOTED',
-    );
+  if (existingRecordError) {
+    throw new ApiError(500, 'Failed to validate voting status', 'VOTE_STATUS_CHECK_FAILED');
+  }
+
+  const { data: existingVotes, error: existingVotesError } = await supabase
+    .from('votes')
+    .select('id')
+    .eq('voter_id', userId)
+    .eq('election_id', electionId)
+    .limit(1);
+
+  if (existingVotesError) {
+    throw new ApiError(500, 'Failed to validate voting status', 'VOTE_STATUS_CHECK_FAILED');
+  }
+
+  const hasVoted = (existingRecord && existingRecord.length > 0) || (existingVotes && existingVotes.length > 0);
+  if (hasVoted) {
+    return {
+      eligible: false,
+      hasVoted: true,
+      webauthnRegistered: !!user.webauthn_registered,
+      message: 'You have already voted in this election. Double voting is not permitted.',
+      electionTitle: election.title,
+      userType: user.user_type,
+    };
   }
 
   // Check election is ongoing
@@ -281,6 +300,9 @@ export const checkVotingEligibility = async (userId: string, electionId: string)
 
   return {
     eligible: true,
+    hasVoted: false,
+    webauthnRegistered: !!user.webauthn_registered,
+    message: 'You are eligible to vote in this election.',
     electionTitle: election.title,
     userType: user.user_type,
   };
@@ -372,18 +394,43 @@ export const submitVote = async (
   }
 
   // Check if user has already voted in this election globally
-  const { data: existingVoterRecord } = await supabase
+  const { data: existingVoterRecord, error: existingVoterRecordError } = await supabase
     .from('voter_records')
-    .select('*')
+    .select('id')
     .eq('user_id', userId)
     .eq('election_id', input.electionId)
-    .single();
+    .limit(1);
 
-  if (existingVoterRecord) {
+  if (existingVoterRecordError) {
+    throw new ApiError(500, 'Failed to validate voting status', 'VOTE_STATUS_CHECK_FAILED');
+  }
+
+  if (existingVoterRecord && existingVoterRecord.length > 0) {
     throw new ApiError(
       409,
       'You have already participated in this election',
       'DOUBLE_VOTE_DETECTED',
+    );
+  }
+
+  // Fallback protection: block if any votes already exist for this election/user
+  // This guards against missing voter_records rows or failed inserts.
+  const { data: existingVotes, error: existingVotesError } = await supabase
+    .from('votes')
+    .select('id')
+    .eq('voter_id', userId)
+    .eq('election_id', input.electionId)
+    .limit(1);
+
+  if (existingVotesError) {
+    throw new ApiError(500, 'Failed to validate voting status', 'VOTE_STATUS_CHECK_FAILED');
+  }
+
+  if (existingVotes && existingVotes.length > 0) {
+    throw new ApiError(
+      409,
+      'You have already voted in this election. Double voting is not permitted.',
+      'ALREADY_VOTED',
     );
   }
 
@@ -449,8 +496,17 @@ export const submitVote = async (
   };
 
   const votePayloads: any[] = [];
+  const seenPositions = new Set<string>();
   for (const vote of input.votes) {
     const resolvedPositionId = await resolvePositionId(vote.positionId);
+    if (seenPositions.has(resolvedPositionId)) {
+      throw new ApiError(
+        409,
+        'Duplicate vote detected for the same position.',
+        'DOUBLE_VOTE_DETECTED',
+      );
+    }
+    seenPositions.add(resolvedPositionId);
     votePayloads.push({
       voter_id: userId,
       election_id: input.electionId,

@@ -52,7 +52,7 @@ router.post('/eligibility', authMiddleware, async (req: AuthenticatedRequest, re
     }
 
     const result = await votingService.checkVotingEligibility(req.user.id, electionId);
-    res.status(200).json(result);
+    res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

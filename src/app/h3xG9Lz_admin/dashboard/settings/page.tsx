@@ -3,18 +3,17 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Settings, Globe, FileText, Download, Loader2, Save, Shield
+  Settings, Globe, Loader2, Save, Shield
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
-import { getSystemSettings, updateSystemSettings, getAuditLogs, createAdmin, exportAuditLogs } from "@/services/adminService";
-import { UserPlus, RefreshCw, Key, Mail, User, AlertCircle, CheckCircle2, ChevronDown, FileSpreadsheet, FileJson, FileCode } from "lucide-react";
+import { getSystemSettings, updateSystemSettings, createAdmin } from "@/services/adminService";
+import { UserPlus, RefreshCw, Key, Mail, User, AlertCircle, CheckCircle2 } from "lucide-react";
 
-type SettingsTab = "general" | "admins" | "audit";
+type SettingsTab = "general" | "admins";
 
 const tabs: { id: SettingsTab; label: string; icon: any }[] = [
   { id: "general", label: "General", icon: Globe },
   { id: "admins", label: "Administrators", icon: Shield },
-  { id: "audit", label: "Audit & Logs", icon: FileText },
 ];
 
 const FieldRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -39,18 +38,10 @@ export default function SettingsPage() {
     systemLogo: "",
   });
 
-  const [logFilter, setLogFilter] = useState({ admin: "all", type: "all" });
-  const [realLogs, setRealLogs] = useState<any[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
-
   // Admin creation state
   const [newAdmin, setNewAdmin] = useState({ username: "", email: "", password: "" });
   const [adminCreating, setAdminCreating] = useState(false);
   const [adminMessage, setAdminMessage] = useState({ text: "", type: "" });
-
-  // Export state
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -77,25 +68,7 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
-  useEffect(() => {
-    if (activeTab === "audit") {
-      fetchLogs();
-    }
-  }, [activeTab]);
 
-  const fetchLogs = async () => {
-    setLogsLoading(true);
-    try {
-      const resp = await getAuditLogs();
-      if (resp.success) {
-        setRealLogs(resp.data || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch logs:", error);
-    } finally {
-      setLogsLoading(false);
-    }
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,27 +125,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleExport = async (format: string) => {
-    setExportingFormat(format);
-    setShowExportMenu(false);
-    try {
-      const selectedAdmin = realLogs.find(l => l.admin_name === logFilter.admin)?.admin_id;
-      await exportAuditLogs(format, logFilter.admin === 'all' ? undefined : selectedAdmin);
-    } catch (error) {
-      console.error("Export error:", error);
-    } finally {
-      setExportingFormat(null);
-    }
-  };
 
-  const filteredLogs = realLogs.filter(
-    (l) =>
-      (logFilter.admin === "all" || l.admin_name === logFilter.admin) &&
-      (logFilter.type === "all" || l.resource_type === logFilter.type)
-  );
-
-  const adminList = Array.from(new Set(realLogs.map(l => l.admin_name))).filter(Boolean);
-  const typeList = Array.from(new Set(realLogs.map(l => l.resource_type))).filter(Boolean);
 
   if (loading) {
     return (
@@ -366,167 +319,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeTab === "audit" && (
-          <div>
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              <div className="relative group">
-                <select
-                  value={logFilter.admin}
-                  onChange={(e) => setLogFilter({ ...logFilter, admin: e.target.value })}
-                  className="h-10 pl-3 pr-8 rounded-lg bg-muted/40 border border-border/50 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="all">All Admins</option>
-                  {adminList.map(admin => (
-                    <option key={admin} value={admin}>{admin}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground/30 group-hover:text-primary/50 transition-all">
-                  <Shield className="w-3 h-3" />
-                </div>
-              </div>
-
-              <div className="relative group">
-                <select
-                  value={logFilter.type}
-                  onChange={(e) => setLogFilter({ ...logFilter, type: e.target.value })}
-                  className="h-10 pl-3 pr-8 rounded-lg bg-muted/40 border border-border/50 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="all">All Types</option>
-                  {typeList.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground/30 group-hover:text-primary/50 transition-all">
-                  <FileText className="w-3 h-3" />
-                </div>
-              </div>
-
-              <button
-                onClick={fetchLogs}
-                disabled={logsLoading}
-                className="h-10 px-3 rounded-lg bg-muted/20 border border-border/50 hover:bg-muted/40 transition-all group"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-all ${logsLoading ? 'animate-spin' : ''}`} />
-              </button>
-
-              <div className="relative ml-auto">
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20 transition-all font-medium"
-                >
-                  {exportingFormat ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                  {exportingFormat ? `Exporting ${exportingFormat.toUpperCase()}...` : "Download Report"}
-                  <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
-                </button>
-
-                {showExportMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    className="absolute right-0 mt-2 w-48 glass-card border border-primary/20 rounded-xl py-2 z-50 shadow-xl"
-                  >
-                    {[
-                      { id: 'excel', label: 'Excel (XLSX)', icon: FileSpreadsheet },
-                      { id: 'csv', label: 'Comma Separated (CSV)', icon: FileCode },
-                      { id: 'json', label: 'JSON Data', icon: FileJson },
-                    ].map((fmt) => (
-                      <button
-                        key={fmt.id}
-                        onClick={() => handleExport(fmt.id)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors text-left"
-                      >
-                        <fmt.icon className="w-3.5 h-3.5 text-primary/60" />
-                        {fmt.label}
-                      </button>
-                    ))}
-                    <div className="px-4 py-2 mt-1 border-t border-border/10">
-                      <p className="text-[9px] text-muted-foreground">PDF support coming soon.</p>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </div>
-
-            <div className="glass-card rounded-xl overflow-hidden min-h-[400px]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/20">
-                    {["Date & Time", "Admin", "Action", "Type"].map((h) => (
-                      <th key={h} className="text-left px-4 py-3 text-[10px] text-muted-foreground tracking-wider uppercase font-medium">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {logsLoading ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-20 text-center">
-                        <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
-                        <span className="text-xs text-muted-foreground">Fetching activity logs...</span>
-                      </td>
-                    </tr>
-                  ) : filteredLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-20 text-center text-xs text-muted-foreground">
-                        No activity records found matching filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredLogs.map((log, i) => {
-                      let details = { description: log.action };
-                      try {
-                        if (log.details) {
-                          details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
-                        }
-                      } catch (e) { }
-
-                      return (
-                        <motion.tr
-                          key={log.id}
-                          className="border-b border-border/10 hover:bg-muted/20 transition-colors"
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.01 }}
-                        >
-                          <td className="px-4 py-3 text-xs text-muted-foreground font-mono">
-                            {new Date(log.created_at).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col">
-                              <span className="text-xs text-foreground font-medium">{log.admin_name}</span>
-                              <span className="text-[9px] text-muted-foreground/60">{log.ip_address || '---'}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col">
-                              <span className="text-xs text-foreground">{log.action.replace(/_/g, ' ')}</span>
-                              <span className="text-[10px] text-muted-foreground/80 font-light truncate max-w-xs">{details.description || ''}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full ${log.resource_type === 'VOTER' ? 'bg-blue-500/10 text-blue-400' :
-                              log.resource_type === 'ELECTION' ? 'bg-purple-500/10 text-purple-400' :
-                                log.resource_type === 'ADMIN' ? 'bg-emerald-500/10 text-emerald-400' :
-                                  'bg-muted/30 text-muted-foreground'
-                              }`}>
-                              {log.resource_type}
-                            </span>
-                          </td>
-                        </motion.tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-4 glass-card rounded-xl p-4 border border-primary/10">
-              <p className="text-[10px] text-primary/50 flex items-center gap-2">
-                <Shield className="w-3.5 h-3.5 flex-shrink-0" />
-                Every administrative action is immutably logged with IP tracking. Audit records cannot be deleted or modified.
-              </p>
-            </div>
-          </div>
-        )}
       </motion.div>
     </DashboardLayout>
   );
