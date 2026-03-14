@@ -26,14 +26,15 @@ const LoginPage = () => {
   const [rememberDevice, setRememberDevice] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [shakeField, setShakeField] = useState<string | null>(null);
-  
+
   const [adminId, setAdminId] = useState("");
+  const [isAdminRegistered, setIsAdminRegistered] = useState(true);
 
   // OTP states
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [otpLoading, setOtpLoading] = useState(false);
-  
+
   // Biometric states
   const [biometricProgress, setBiometricProgress] = useState(0);
 
@@ -84,15 +85,21 @@ const LoginPage = () => {
     return "Biometric verification failed. Please try again or use OTP fallback.";
   };
 
-  const storeTokenAndRedirect = (accessToken: string) => {
+  const storeTokenAndRedirect = (accessToken: string, user?: any) => {
     const cookieOptions = rememberDevice
       ? { expires: 7, path: "/" as const }
       : { path: "/" as const };
     Cookies.set("admin_token", accessToken, cookieOptions);
-    setTimeout(() => router.push("/h3xG9Lz_admin/dashboard"), 1500);
+
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+    }
+
+    const targetPath = isAdminRegistered ? "/h3xG9Lz_admin/dashboard" : "/h3xG9Lz_admin/dashboard/security/enroll";
+    setTimeout(() => router.push(targetPath), 1500);
   };
 
-  const startBiometricScan = (accessToken: string) => {
+  const startBiometricScan = (accessToken: string, user: any) => {
     setBiometricProgress(0);
     const interval = setInterval(() => {
       setBiometricProgress((prev) => {
@@ -101,7 +108,7 @@ const LoginPage = () => {
           setTimeout(() => {
             setStage("success");
             setStatus("success");
-            storeTokenAndRedirect(accessToken);
+            storeTokenAndRedirect(accessToken, user);
           }, 400);
           return 100;
         }
@@ -133,29 +140,30 @@ const LoginPage = () => {
 
       const { adminId: fetchedAdminId, isRegistered } = statusResp.data;
       setAdminId(fetchedAdminId);
+      setIsAdminRegistered(isRegistered);
 
       if (!isRegistered) {
-        setStatus("error");
-        setErrorMessage("Admin not registered for Biometrics. Please set up using the email link or contact IT.");
-        setTimeout(() => setStatus("idle"), 5000);
+        setStatus("idle");
+        setErrorMessage("Biometrics not registered. Please log in with OTP to set up secure access.");
+        // We don't return here, we let them use the OTP button which is already visible
         return;
       }
 
       // 2. Get auth options
       const optionsResp = await getAdminAuthenticationOptions(fetchedAdminId);
       if (!optionsResp.success || !optionsResp.data) {
-         setStatus("error");
-         setErrorMessage(optionsResp.error || "Failed to start biometric auth");
-         setTimeout(() => setStatus("idle"), 3000);
-         return;
+        setStatus("error");
+        setErrorMessage(optionsResp.error || "Failed to start biometric auth");
+        setTimeout(() => setStatus("idle"), 3000);
+        return;
       }
 
       const opts = optionsResp.data as any;
       const { startAuthentication } = await import('@simplewebauthn/browser');
-      
+
       setStatus("idle");
       setStage("biometric");
-      
+
       let asseResp;
       try {
         asseResp = await startAuthentication({ optionsJSON: opts });
@@ -170,7 +178,7 @@ const LoginPage = () => {
       // 3. Verify auth
       const verifyResp = await verifyAdminAuthentication(fetchedAdminId, asseResp);
       if (verifyResp.success && verifyResp.data?.accessToken) {
-        startBiometricScan(verifyResp.data.accessToken);
+        startBiometricScan(verifyResp.data.accessToken, verifyResp.data.user);
       } else {
         setStage("credentials");
         setStatus("error");
@@ -194,7 +202,7 @@ const LoginPage = () => {
 
     setOtpLoading(true);
     setErrorMessage("");
-    
+
     let currentAdminId = adminId;
     if (!currentAdminId) {
       const statusResp = await checkAdminStatus(email);
@@ -205,11 +213,12 @@ const LoginPage = () => {
       }
       currentAdminId = statusResp.data.adminId;
       setAdminId(currentAdminId);
+      setIsAdminRegistered(statusResp.data.isRegistered);
     }
 
     const resp = await requestAdminOtp(currentAdminId);
     setOtpLoading(false);
-    
+
     if (resp.success) {
       setStage("otp");
     } else {
@@ -227,14 +236,14 @@ const LoginPage = () => {
 
     setOtpLoading(true);
     setErrorMessage("");
-    
+
     const resp = await verifyAdminOtp(adminId, otpCode);
     setOtpLoading(false);
-    
+
     if (resp.success && resp.data?.accessToken) {
       setStage("success");
       setStatus("success");
-      storeTokenAndRedirect(resp.data.accessToken);
+      storeTokenAndRedirect(resp.data.accessToken, resp.data.user);
     } else {
       setErrorMessage(resp.error || "Invalid OTP");
       triggerShake("otp");
@@ -387,7 +396,7 @@ const LoginPage = () => {
                       )}
                     </AnimatePresence>
                   </motion.button>
-                  
+
                   <button type="button" onClick={handleRequestOtpFallback} disabled={status === "loading" || otpLoading} className="w-full h-12 rounded-lg text-sm font-medium transition-all duration-300 bg-muted/40 hover:bg-muted/60 disabled:opacity-70 text-foreground flex items-center justify-center gap-2">
                     {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                     Login with OTP
@@ -437,13 +446,13 @@ const LoginPage = () => {
             )}
 
             {stage === "success" && (
-               <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="flex flex-col items-center text-center py-6">
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200, damping: 15 }} className="w-16 h-16 rounded-full bg-success/15 border-2 border-success/40 flex items-center justify-center mb-4" style={{ boxShadow: "0 0 40px -8px hsl(var(--success) / 0.3)" }}>
-                    <Check className="w-8 h-8 text-success" />
-                  </motion.div>
-                  <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-lg font-bold text-foreground mb-1">Access Granted</motion.h2>
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="text-xs text-muted-foreground">Entering Control Center…</motion.p>
-               </motion.div>
+              <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="flex flex-col items-center text-center py-6">
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200, damping: 15 }} className="w-16 h-16 rounded-full bg-success/15 border-2 border-success/40 flex items-center justify-center mb-4" style={{ boxShadow: "0 0 40px -8px hsl(var(--success) / 0.3)" }}>
+                  <Check className="w-8 h-8 text-success" />
+                </motion.div>
+                <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-lg font-bold text-foreground mb-1">Access Granted</motion.h2>
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="text-xs text-muted-foreground">Entering Control Center…</motion.p>
+              </motion.div>
             )}
           </AnimatePresence>
 

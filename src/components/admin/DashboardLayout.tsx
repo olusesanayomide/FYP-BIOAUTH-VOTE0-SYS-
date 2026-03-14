@@ -56,6 +56,21 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(true);
+
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      try {
+        const user = JSON.parse(userJson);
+        // Check both top level and permissions level depending on how it's stored
+        const regStatus = user.isRegistered ?? user.permissions?.isRegistered ?? true;
+        setIsRegistered(regStatus);
+      } catch (e) {
+        console.error("Failed to parse user for registration status", e);
+      }
+    }
+  }, [pathname]);
 
   const navigateTo = (path: string) => {
     const currentPath = pathname || "";
@@ -365,6 +380,35 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
 
         <main className="flex-1 p-6 lg:p-10">
           <div className="max-w-[1400px] mx-auto space-y-8">
+            <AnimatePresence>
+              {!isRegistered && !pathname?.includes('enroll') && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-6"
+                >
+                  <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                        <Fingerprint className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Secure your account with Biometrics</p>
+                        <p className="text-xs text-muted-foreground">You are currently using OTP fallback. Register a passkey for faster, more secure access.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigateTo("/h3xG9Lz_admin/dashboard/security/enroll")}
+                      className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-lg hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2"
+                    >
+                      <span>Enable Now</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <AnimatePresence>
               {pendingPath && (
                 <motion.div

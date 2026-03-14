@@ -1063,7 +1063,7 @@ export const requestAdminSetupLink = async (email: string) => {
 
   // 2. Generate secure token
   const token = crypto.randomBytes(32).toString('hex');
-  
+
   // 3. Set expiration (24 hours)
   const expiryMs = getUTCNow() + 24 * 60 * 60 * 1000;
   const expiresAt = new Date(expiryMs).toISOString();
@@ -1083,7 +1083,7 @@ export const requestAdminSetupLink = async (email: string) => {
 
   // 5. Send Email
   const setupLink = `${ORIGIN}/admin/register-biometric?token=${token}`;
-  
+
   try {
     await sendAdminSetupEmail(admin.email, admin.username, setupLink);
   } catch (emailError) {
@@ -1301,10 +1301,10 @@ export const checkAdminStatus = async (email: string) => {
   }
 
   return {
-    id: admin.id,
+    adminId: admin.id,
     email: admin.email,
     username: admin.username,
-    webauthn_registered: admin.webauthn_registered
+    isRegistered: admin.webauthn_registered
   };
 };
 
@@ -1487,7 +1487,7 @@ export const requestAdminOtp = async (adminId: string) => {
   // Generate OTP
   const otp = crypto.randomInt(100000, 999999).toString();
   const otpHash = await bcryptjs.hash(otp, 10);
-  
+
   // Calculate expiry in UTC: current UTC time + OTP_EXPIRY_MINUTES
   const expiryMs = getUTCNow() + OTP_EXPIRY_MINUTES * 60 * 1000;
   const expiresAt = new Date(expiryMs).toISOString();
@@ -1559,9 +1559,9 @@ export const verifyAdminOtp = async (adminId: string, otpCode: string, ipAddress
   // Clear OTP and update last login
   await supabase
     .from('admin')
-    .update({ 
-      otp_hash: null, 
-      otp_expires_at: null, 
+    .update({
+      otp_hash: null,
+      otp_expires_at: null,
       otp_attempts: 0,
       last_login_at: new Date().toISOString()
     })
@@ -1591,7 +1591,8 @@ export const verifyAdminOtp = async (adminId: string, otpCode: string, ipAddress
           manageElections: admin.can_manage_elections,
           manageUsers: admin.can_manage_users,
           manageCandidates: admin.can_manage_candidates,
-          viewAuditLogs: admin.can_view_audit_logs
+          viewAuditLogs: admin.can_view_audit_logs,
+          isRegistered: admin.webauthn_registered
         }
       },
     },

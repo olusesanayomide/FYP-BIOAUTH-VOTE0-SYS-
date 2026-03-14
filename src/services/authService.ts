@@ -420,3 +420,33 @@ export const verifyAdminOtp = async (adminId: string, otp: string): Promise<ApiR
     };
   }
 };
+
+/**
+ * Get Admin WebAuthn registration options for biometric enrollment
+ */
+export const getAdminWebauthnRegistrationOptions = async (adminId: string): Promise<ApiResponse<WebAuthnRegistrationOptions>> => {
+  try {
+    const response = await apiClient.post('/auth/admin/webauthn/registration-options', { adminId });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Failed to get registration options',
+    };
+  }
+};
+
+/**
+ * Verify Admin WebAuthn registration
+ */
+export const verifyAdminWebauthnRegistration = async (adminId: string, response: any): Promise<ApiResponse> => {
+  try {
+    const apiResponse = await apiClient.post('/auth/admin/webauthn/verify-registration', { adminId, response });
+    return apiResponse.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Biometric registration failed',
+    };
+  }
+};
