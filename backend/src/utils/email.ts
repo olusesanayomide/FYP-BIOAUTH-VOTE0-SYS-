@@ -35,6 +35,42 @@ const buildHtml = (name: string, otp: string) => `
   </div>
 `;
 
+const buildAdminSetupHtml = (name: string, setupLink: string) => `
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background: linear-gradient(135deg, #10b981 0%, #047857 100%); padding: 40px; text-align: center; border-radius: 8px 8px 0 0;">
+      <h1 style="color: white; margin: 0; font-size: 28px;">Admin Portal Setup</h1>
+    </div>
+    
+    <div style="padding: 40px; background: #f9fafb; border-radius: 0 0 8px 8px;">
+      <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Hello ${name},</p>
+      
+      <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin-bottom: 30px;">
+        You have been invited to set up your Administrator account for the Secure Voting System. 
+        Please click the button below to register your biometric credentials to access the dashboard.
+      </p>
+      
+      <div style="text-align: center; margin-bottom: 30px;">
+        <a href="${setupLink}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+          Set Up Admin Account
+        </a>
+      </div>
+      
+      <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
+        <strong>This link expires in 24 hours.</strong> If the button doesn't work, copy and paste this link into your browser:
+        <br>
+        <a href="${setupLink}" style="color: #10b981; word-break: break-all;">${setupLink}</a>
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+      
+      <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+        This is an automated message. Please do not reply to this email.
+      </p>
+    </div>
+  </div>
+`;
+
+
 const initializeSmtpTransporter = () => {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'localhost',
@@ -109,11 +145,64 @@ export const sendOtpEmail = async (email: string, otp: string, name: string) => 
 
     console.log(`[EMAIL] OTP email accepted by SMTP server for recipient: ${recipient}`);
     return { success: true };
-  } catch (error) {
+} catch (error) {
     console.error('Failed to send OTP email via SMTP:', error);
     throw new Error('Failed to send verification code');
   }
 };
 
+export const sendAdminSetupEmail = async (email: string, name: string, setupLink: string) => {
+  const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
+  const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
+  const recipient = forcedRecipient || email;
+  const textBody = `Hello ${name},\n\nYou have been invited to set up your Administrator account for the Secure Voting System. Please click the following link to register your biometric credentials:\n\n${setupLink}\n\nThis link expires in 24 hours.`;
 
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    try {
+      const payload = {
+        from,
+        to: recipient,
+        subject: 'Admin Portal Setup Invitation',
+        html: buildAdminSetupHtml(name, setupLink),
+      };
 
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${resendKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to send email via Resend');
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Resend send failed, falling back to SMTP:', err);
+    }
+  }
+
+  // Fallback to SMTP
+  try {
+    const transporter = initializeSmtpTransporter();
+    await transporter.verify();
+
+    const info = await transporter.sendMail({
+      from,
+      to: recipient,
+      subject: 'Admin Portal Setup Invitation',
+      html: buildAdminSetupHtml(name, setupLink),
+      text: textBody,
+      replyTo: from,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send Admin Setup email via SMTP:', error);
+    throw new Error('Failed to send Admin Setup email');
+  }
+};

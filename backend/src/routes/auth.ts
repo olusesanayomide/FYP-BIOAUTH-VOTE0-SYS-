@@ -264,6 +264,188 @@ router.post('/login/verify-otp', async (req: Request, res: Response, next: NextF
 });
 
 /**
+ * POST /auth/admin/setup/request
+ * Request an admin setup link (sends email with token)
+ * Body: { email: string }
+ */
+router.post('/admin/setup/request', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new ApiError(400, 'Missing email', 'MISSING_FIELDS');
+    }
+
+    const result = await authService.requestAdminSetupLink(email);
+    sendResponse(res, 200, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/setup/verify
+ * Verify an admin setup token to proceed with WebAuthn registration
+ * Body: { token: string }
+ */
+router.post('/admin/setup/verify', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      throw new ApiError(400, 'Missing token', 'MISSING_FIELDS');
+    }
+
+    const result = await authService.verifyAdminSetupToken(token);
+    sendResponse(res, 200, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/webauthn/registration-options
+ * Get WebAuthn registration challenge for an admin
+ * Body: { adminId: string }
+ */
+router.post('/admin/webauthn/registration-options', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { adminId } = req.body;
+
+    if (!adminId) {
+      throw new ApiError(400, 'Missing adminId', 'MISSING_FIELDS');
+    }
+
+    const options = await authService.getAdminWebauthnRegistrationOptions(adminId);
+    sendResponse(res, 200, options);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/webauthn/verify-registration
+ * Verify WebAuthn registration response for an admin
+ * Body: { adminId: string, response: any }
+ */
+router.post('/admin/webauthn/verify-registration', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { adminId, response } = req.body;
+
+    if (!adminId || !response) {
+      throw new ApiError(400, 'Missing adminId or response', 'MISSING_FIELDS');
+    }
+
+    const result = await authService.verifyAdminWebauthnRegistration(adminId, response);
+    sendResponse(res, 200, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/status
+ * Check if the admin is registered for webauthn so frontend can route appropriately
+ * Body: { email: string }
+ */
+router.post('/admin/status', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new ApiError(400, 'Missing email', 'MISSING_FIELDS');
+    }
+
+    const result = await authService.checkAdminStatus(email);
+    sendResponse(res, 200, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/webauthn/authentication-options
+ * Get WebAuthn authentication challenge for an admin
+ * Body: { adminId: string }
+ */
+router.post('/admin/webauthn/authentication-options', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { adminId } = req.body;
+
+    if (!adminId) {
+      throw new ApiError(400, 'Missing adminId', 'MISSING_FIELDS');
+    }
+
+    const options = await authService.getAdminAuthenticationOptions(adminId);
+    sendResponse(res, 200, options);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/webauthn/verify-authentication
+ * Verify WebAuthn authentication response for an admin
+ * Body: { adminId: string, response: any }
+ */
+router.post('/admin/webauthn/verify-authentication', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { adminId, response } = req.body;
+
+    if (!adminId || !response) {
+      throw new ApiError(400, 'Missing adminId or response', 'MISSING_FIELDS');
+    }
+
+    const result = await authService.verifyAdminAuthentication(adminId, response, req.ip, req.get('user-agent'));
+    sendResponse(res, 200, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/login/request-otp
+ * Request an OTP for an admin to login
+ * Body: { adminId: string }
+ */
+router.post('/admin/login/request-otp', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { adminId } = req.body;
+
+    if (!adminId) {
+      throw new ApiError(400, 'Missing adminId', 'MISSING_FIELDS');
+    }
+
+    // You can also accept email here and look up the adminId, 
+    // but assuming Frontend has adminId from checkAdminStatus
+    const result = await authService.requestAdminOtp(adminId);
+    sendResponse(res, 200, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /auth/admin/login/verify-otp
+ * Verify admin OTP and issue JWT
+ * Body: { adminId: string, otp: string }
+ */
+router.post('/admin/login/verify-otp', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { adminId, otp } = req.body;
+
+    if (!adminId || !otp) {
+      throw new ApiError(400, 'Missing adminId or otp', 'MISSING_FIELDS');
+    }
+
+    const result = await authService.verifyAdminOtp(adminId, otp, req.ip, req.get('user-agent'));
+    sendResponse(res, 200, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * POST /auth/admin-login
  * Admin login endpoint with email/password and RBAC check
  * Body: { email: string, password: string }

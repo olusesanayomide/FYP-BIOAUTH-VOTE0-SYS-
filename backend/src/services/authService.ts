@@ -1,6 +1,6 @@
 import { supabase } from '../config/supabase';
 import { generateToken } from '../utils/jwt';
-import { sendOtpEmail } from '../utils/email';
+import { sendOtpEmail, sendAdminSetupEmail } from '../utils/email';
 import { encryptData, decryptData } from '../utils/encryption';
 import { ApiError } from '../middleware/errorHandler';
 import bcryptjs from 'bcryptjs';
@@ -1030,6 +1030,568 @@ export const adminLogin = async (email: string, passwordString: string, ipAddres
           manageUsers: adminUser.can_manage_users,
           manageCandidates: adminUser.can_manage_candidates,
           viewAuditLogs: adminUser.can_view_audit_logs
+        }
+      },
+    },
+  };
+};
+
+/**
+ * Request Admin Setup Link
+ * Generates a registration token for an existing pre-created admin without a password
+ */
+export const requestAdminSetupLink = async (email: string) => {
+  const adminEmail = normalizeEmail(email);
+  if (!adminEmail) {
+    throw new ApiError(400, 'Email is required', 'MISSING_FIELDS');
+  }
+
+  // 1. Check if Admin exists
+  const { data: admin, error } = await supabase
+    .from('admin')
+    .select('id, email, username, webauthn_registered')
+    .ilike('email', adminEmail)
+    .single();
+
+  if (error || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  if (admin.webauthn_registered) {
+    throw new ApiError(400, 'Admin has already completed setup', 'ALREADY_REGISTERED');
+  }
+
+  // 2. Generate secure token
+  const token = crypto.randomBytes(32).toString('hex');
+  
+  // 3. Set expiration (24 hours)
+  const expiryMs = getUTCNow() + 24 * 60 * 60 * 1000;
+  const expiresAt = new Date(expiryMs).toISOString();
+
+  // 4. Save to DB
+  const { error: updateError } = await supabase
+    .from('admin')
+    .update({
+      registration_token: token,
+      registration_token_expires_at: expiresAt
+    })
+    .eq('id', admin.id);
+
+  if (updateError) {
+    throw new ApiError(500, 'Failed to generate setup token', 'TOKEN_GENERATION_FAILED');
+  }
+
+  // 5. Send Email
+  const setupLink = `${ORIGIN}/admin/register-biometric?token=${token}`;
+  
+  try {
+    await sendAdminSetupEmail(admin.email, admin.username, setupLink);
+  } catch (emailError) {
+    console.error('Failed to send admin setup email', emailError);
+    throw new ApiError(500, 'Failed to send setup link', 'EMAIL_SEND_FAILED');
+  }
+
+  await logAuditAction(admin.id, 'ADMIN_SETUP_LINK_SENT', 'ADMIN', admin.id, 'SUCCESS');
+
+  return {
+    message: 'Setup link sent successfully',
+    email: admin.email
+  };
+};
+
+/**
+ * Verify Admin Setup Token
+ */
+export const verifyAdminSetupToken = async (token: string) => {
+  if (!token) {
+    throw new ApiError(400, 'Token is required', 'MISSING_FIELDS');
+  }
+
+  const { data: admin, error } = await supabase
+    .from('admin')
+    .select('id, email, username, registration_token_expires_at')
+    .eq('registration_token', token)
+    .single();
+
+  if (error || !admin) {
+    throw new ApiError(400, 'Invalid or expired setup token', 'INVALID_TOKEN');
+  }
+
+  // Check Expiry
+  if (!admin.registration_token_expires_at) {
+    throw new ApiError(400, 'Invalid token', 'INVALID_TOKEN');
+  }
+
+  const expiresAtMs = new Date(admin.registration_token_expires_at).getTime();
+  const nowMs = getUTCNow();
+
+  if (expiresAtMs < nowMs) {
+    throw new ApiError(400, 'Setup token has expired. Please request a new one.', 'TOKEN_EXPIRED');
+  }
+
+  // Token is valid, return basic info so frontend can proceed to WebAuthn registration
+  return {
+    id: admin.id,
+    email: admin.email,
+    username: admin.username
+  };
+};
+
+/**
+ * Get Admin WebAuthn Registration Options
+ */
+export const getAdminWebauthnRegistrationOptions = async (adminId: string) => {
+  const { data: admin, error } = await supabase
+    .from('admin')
+    .select('id, email, username, webauthn_registered')
+    .eq('id', adminId)
+    .single();
+
+  if (error || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  if (admin.webauthn_registered) {
+    throw new ApiError(400, 'Admin is already registered for biometric login', 'ALREADY_REGISTERED');
+  }
+
+  // Get existing authenticators (should be none for new registration, but good practice)
+  const { data: authenticators } = await supabase
+    .from('admin_authenticators')
+    .select('*')
+    .eq('admin_id', adminId);
+
+  const options = await generateRegistrationOptions({
+    rpName: RP_NAME,
+    rpID: RP_ID,
+    userID: admin.id,
+    userName: admin.email,
+    userDisplayName: admin.username,
+    attestationType: 'none',
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+      residentKey: 'preferred',
+      userVerification: 'required',
+    },
+    excludeCredentials: (authenticators || []).map((auth) => ({
+      id: Buffer.from(auth.credential_id, 'base64url'),
+      type: 'public-key' as const,
+      transports: auth.transports || [],
+    })),
+  });
+
+  // Extract the encoded challenge
+  const challenge = options.challenge;
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+  // Save the EXACT challenge string and expiry to the database
+  await supabase
+    .from('admin')
+    .update({
+      current_challenge: challenge,
+      current_challenge_expires_at: expiresAt
+    })
+    .eq('id', adminId);
+
+  return options;
+};
+
+/**
+ * Verify Admin WebAuthn Registration
+ */
+export const verifyAdminWebauthnRegistration = async (adminId: string, response: any) => {
+  const { data: admin, error: adminError } = await supabase
+    .from('admin')
+    .select('*')
+    .eq('id', adminId)
+    .single();
+
+  if (adminError || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  if (!admin.current_challenge) {
+    throw new ApiError(400, 'No registration challenge found. Start over.', 'CHALLENGE_NOT_FOUND');
+  }
+
+  // Check challenge expiration
+  const expiresAtMs = parseUTCDate(admin.current_challenge_expires_at);
+  const nowMs = getUTCNow();
+
+  if (expiresAtMs > 0 && expiresAtMs < nowMs) {
+    throw new ApiError(400, 'Registration challenge has expired. Please try again.', 'CHALLENGE_EXPIRED');
+  }
+
+  try {
+    const verified = await verifyRegistrationResponse({
+      response: response,
+      expectedChallenge: admin.current_challenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+      requireUserVerification: true,
+    });
+
+    if (!verified?.verified || !verified?.registrationInfo) {
+      throw new ApiError(400, 'Biometric registration verification failed', 'VERIFICATION_FAILED');
+    }
+
+    const { registrationInfo } = verified;
+    const credentialId = Buffer.from(registrationInfo.credentialID).toString('base64url');
+    const credentialPubKey = Buffer.from(registrationInfo.credentialPublicKey).toString('base64');
+
+    const encrypted = encryptData(credentialPubKey);
+
+    const { error: authError } = await supabase.from('admin_authenticators').insert({
+      admin_id: adminId,
+      credential_id: credentialId,
+      public_key_encrypted: encrypted.encrypted,
+      public_key_iv: encrypted.iv,
+      counter: registrationInfo.counter ?? 0,
+      transports: response.response?.transports || [],
+    });
+
+    if (authError) {
+      if (authError.code === '23505') {
+        throw new ApiError(409, 'This biometric credential is already registered to an account.', 'DUPLICATE_CREDENTIAL');
+      }
+      throw new ApiError(500, 'Failed to store biometric credential', 'STORAGE_FAILED');
+    }
+
+    await supabase
+      .from('admin')
+      .update({
+        webauthn_registered: true,
+        registration_token: null, // Clear setup token
+        registration_token_expires_at: null,
+        current_challenge: null,
+        current_challenge_expires_at: null,
+      })
+      .eq('id', adminId);
+
+    await logAuditAction(adminId, 'ADMIN_WEBAUTHN_REGISTRATION_COMPLETE', 'ADMIN', adminId, 'SUCCESS');
+
+    return {
+      message: 'Admin biometric registration successful. You can now login.',
+    };
+  } catch (error: any) {
+    if (error instanceof ApiError) throw error;
+    console.error('Admin WebAuthn registration verification error:', error);
+    throw new ApiError(400, `Admin biometric registration failed: ${error.message || 'Verification error'}`, 'VERIFICATION_FAILED');
+  }
+};
+
+/**
+ * Check Admin Status
+ * Returns whether an admin is registered for webauthn so frontend knows which login path to take
+ */
+export const checkAdminStatus = async (email: string) => {
+  const adminEmail = normalizeEmail(email);
+  if (!adminEmail) {
+    throw new ApiError(400, 'Email is required', 'MISSING_FIELDS');
+  }
+
+  const { data: admin, error } = await supabase
+    .from('admin')
+    .select('id, email, username, webauthn_registered')
+    .ilike('email', adminEmail)
+    .single();
+
+  if (error || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  return {
+    id: admin.id,
+    email: admin.email,
+    username: admin.username,
+    webauthn_registered: admin.webauthn_registered
+  };
+};
+
+/**
+ * Get Admin Authentication Options (WebAuthn Login)
+ */
+export const getAdminAuthenticationOptions = async (adminId: string) => {
+  const { data: admin, error: adminError } = await supabase
+    .from('admin')
+    .select('*')
+    .eq('id', adminId)
+    .single();
+
+  if (adminError || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  const { data: authenticators, error: authError } = await supabase
+    .from('admin_authenticators')
+    .select('*')
+    .eq('admin_id', adminId);
+
+  if (authError || !authenticators || authenticators.length === 0) {
+    throw new ApiError(400, 'Admin has not registered biometric credentials', 'NO_AUTHENTICATORS');
+  }
+
+  const options = await generateAuthenticationOptions({
+    rpID: RP_ID,
+    userVerification: 'required',
+    allowCredentials: authenticators.map((auth) => ({
+      id: Buffer.from(auth.credential_id, 'base64url'),
+      type: 'public-key' as const,
+      transports: auth.transports || [],
+    })),
+  });
+
+  const challenge = options.challenge;
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+  await supabase
+    .from('admin')
+    .update({
+      current_challenge: challenge,
+      current_challenge_expires_at: expiresAt
+    })
+    .eq('id', adminId);
+
+  return options;
+};
+
+/**
+ * Verify Admin Authentication Response (WebAuthn Login)
+ */
+export const verifyAdminAuthentication = async (adminId: string, response: any, ipAddress?: string, userAgent?: string) => {
+  const { data: admin, error: adminError } = await supabase
+    .from('admin')
+    .select('*')
+    .eq('id', adminId)
+    .single();
+
+  if (adminError || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  if (!admin.current_challenge) {
+    throw new ApiError(400, 'No authentication challenge found. Start over.', 'CHALLENGE_NOT_FOUND');
+  }
+
+  const expiresAtMs = parseUTCDate(admin.current_challenge_expires_at);
+  const nowMs = getUTCNow();
+
+  if (expiresAtMs > 0 && expiresAtMs < nowMs) {
+    throw new ApiError(400, 'Authentication challenge has expired. Please try again.', 'CHALLENGE_EXPIRED');
+  }
+
+  const { data: authenticators } = await supabase
+    .from('admin_authenticators')
+    .select('*')
+    .eq('admin_id', adminId);
+
+  const authenticator = authenticators?.find((auth) => auth.credential_id === response.id);
+
+  if (!authenticator) {
+    throw new ApiError(404, 'Authenticator not found on this account.', 'AUTHENTICATOR_NOT_FOUND');
+  }
+
+  try {
+    const decryptedPublicKey = decryptData(authenticator.public_key_encrypted, authenticator.public_key_iv);
+    if (!decryptedPublicKey) {
+      throw new ApiError(500, 'Failed to decrypt security credential', 'DECRYPTION_FAILED');
+    }
+    const publicKeyBuffer = Buffer.from(decryptedPublicKey, 'base64');
+
+    const verified = await verifyAuthenticationResponse({
+      response: response,
+      expectedChallenge: admin.current_challenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+      requireUserVerification: true,
+      authenticator: {
+        credentialID: Buffer.from(authenticator.credential_id, 'base64url'),
+        credentialPublicKey: publicKeyBuffer,
+        counter: authenticator.counter,
+        transports: authenticator.transports || [],
+      },
+    });
+
+    if (!verified?.verified) {
+      throw new ApiError(400, 'Biometric verification failed', 'VERIFICATION_FAILED');
+    }
+
+    const { authenticationInfo } = verified;
+
+    await supabase.from('admin_authenticators').update({
+      counter: authenticationInfo.newCounter,
+      last_used_at: new Date().toISOString()
+    }).eq('id', authenticator.id);
+
+    await supabase
+      .from('admin')
+      .update({
+        current_challenge: null,
+        current_challenge_expires_at: null,
+        last_login_at: new Date().toISOString()
+      })
+      .eq('id', adminId);
+
+    // Issue JWT with role 'admin'
+    const token = generateToken({
+      sub: admin.id,
+      email: admin.email,
+      matricNumber: 'ADMIN',
+      name: admin.username,
+      role: 'admin',
+    });
+
+    await logAuditAction(admin.id, 'ADMIN_WEBAUTHN_LOGIN_SUCCESS', 'ADMIN', admin.id, 'SUCCESS', ipAddress, userAgent);
+
+    return {
+      success: true,
+      data: {
+        accessToken: token,
+        user: {
+          id: admin.id,
+          email: admin.email,
+          name: admin.username,
+          role: 'admin',
+          permissions: {
+            manageElections: admin.can_manage_elections,
+            manageUsers: admin.can_manage_users,
+            manageCandidates: admin.can_manage_candidates,
+            viewAuditLogs: admin.can_view_audit_logs
+          }
+        },
+      },
+    };
+  } catch (error: any) {
+    if (error instanceof ApiError) throw error;
+    console.error('Admin WebAuthn authentication verification error:', error);
+    await logAuditAction(adminId, 'ADMIN_WEBAUTHN_LOGIN_FAILURE', 'ADMIN', adminId, 'FAILURE', ipAddress, userAgent);
+    throw new ApiError(400, 'Biometric verification failed', 'VERIFICATION_FAILED');
+  }
+};
+
+/**
+ * Request Admin OTP
+ * (Fallback if WebAuthn fails or is unavailable)
+ */
+export const requestAdminOtp = async (adminId: string) => {
+  const { data: admin, error } = await supabase
+    .from('admin')
+    .select('id, email, username')
+    .eq('id', adminId)
+    .single();
+
+  if (error || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  // Generate OTP
+  const otp = crypto.randomInt(100000, 999999).toString();
+  const otpHash = await bcryptjs.hash(otp, 10);
+  
+  // Calculate expiry in UTC: current UTC time + OTP_EXPIRY_MINUTES
+  const expiryMs = getUTCNow() + OTP_EXPIRY_MINUTES * 60 * 1000;
+  const expiresAt = new Date(expiryMs).toISOString();
+
+  const { error: updateError } = await supabase
+    .from('admin')
+    .update({
+      otp_hash: otpHash,
+      otp_expires_at: expiresAt,
+      otp_attempts: 0
+    })
+    .eq('id', admin.id);
+
+  if (updateError) {
+    throw new ApiError(500, 'Failed to generate OTP', 'OTP_GENERATION_FAILED');
+  }
+
+  try {
+    await sendOtpEmail(admin.email, otp, admin.username);
+  } catch (emailError) {
+    throw new ApiError(500, 'Failed to send OTP', 'EMAIL_SEND_FAILED');
+  }
+
+  await logAuditAction(admin.id, 'ADMIN_LOGIN_OTP_SENT', 'ADMIN', admin.id, 'SUCCESS');
+
+  return {
+    message: 'OTP sent to your registered email address',
+    adminId: admin.id,
+  };
+};
+
+/**
+ * Verify Admin OTP
+ */
+export const verifyAdminOtp = async (adminId: string, otpCode: string, ipAddress?: string, userAgent?: string) => {
+  const { data: admin, error } = await supabase
+    .from('admin')
+    .select('*')
+    .eq('id', adminId)
+    .single();
+
+  if (error || !admin) {
+    throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  if (!admin.otp_expires_at) {
+    throw new ApiError(400, 'No OTP found. Request a new one.', 'OTP_NOT_FOUND');
+  }
+
+  const expiresAtMs = new Date(admin.otp_expires_at).getTime();
+  const nowMs = getUTCNow();
+
+  if (expiresAtMs < (nowMs - 5000)) {
+    throw new ApiError(400, 'OTP has expired. Request a new one.', 'OTP_EXPIRED');
+  }
+
+  if (!admin.otp_hash || !(await bcryptjs.compare(otpCode, admin.otp_hash))) {
+    const newAttempts = (admin.otp_attempts || 0) + 1;
+
+    await supabase.from('admin').update({ otp_attempts: newAttempts }).eq('id', admin.id);
+
+    if (newAttempts >= 5) {
+      throw new ApiError(400, 'Too many failed OTP attempts. Request a new OTP.', 'OTP_MAX_ATTEMPTS');
+    }
+
+    throw new ApiError(400, 'Invalid OTP code', 'INVALID_OTP');
+  }
+
+  // Clear OTP and update last login
+  await supabase
+    .from('admin')
+    .update({ 
+      otp_hash: null, 
+      otp_expires_at: null, 
+      otp_attempts: 0,
+      last_login_at: new Date().toISOString()
+    })
+    .eq('id', admin.id);
+
+  // Issue JWT
+  const token = generateToken({
+    sub: admin.id,
+    email: admin.email,
+    matricNumber: 'ADMIN',
+    name: admin.username,
+    role: 'admin',
+  });
+
+  await logAuditAction(admin.id, 'ADMIN_OTP_LOGIN_SUCCESS', 'ADMIN', admin.id, 'SUCCESS', ipAddress, userAgent);
+
+  return {
+    success: true,
+    data: {
+      accessToken: token,
+      user: {
+        id: admin.id,
+        email: admin.email,
+        name: admin.username,
+        role: 'admin',
+        permissions: {
+          manageElections: admin.can_manage_elections,
+          manageUsers: admin.can_manage_users,
+          manageCandidates: admin.can_manage_candidates,
+          viewAuditLogs: admin.can_view_audit_logs
         }
       },
     },
