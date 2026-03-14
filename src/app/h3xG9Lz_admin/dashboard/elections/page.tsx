@@ -21,8 +21,6 @@ interface Election {
   status: ElectionStatus;
   startDate: string;
   endDate: string;
-  votingMethod: string;
-  maxVotes: number;
   biometricEnforced: boolean;
   realTimeMonitoring: boolean;
   eligibilityRules: string;
@@ -120,8 +118,6 @@ const Elections = () => {
             status: mappedStatus,
             startDate: new Date(dbElection.start_time).toLocaleString(),
             endDate: new Date(dbElection.end_time).toLocaleString(),
-            votingMethod: dbElection.voting_method || "Single Choice",
-            maxVotes: dbElection.max_votes || 1,
             biometricEnforced: dbElection.biometric_enforced || false,
             realTimeMonitoring: dbElection.real_time_monitoring || false,
             eligibilityRules: dbElection.eligibility_rules || "All registered students",
@@ -174,7 +170,7 @@ const Elections = () => {
   // Create form state
   const [formData, setFormData] = useState({
     name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "",
-    startDate: "", endDate: "", votingMethod: "Single Choice", maxVotes: 1,
+    startDate: "", endDate: "",
     biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -194,7 +190,13 @@ const Elections = () => {
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({...formData, startDate: new Date(formData.startDate).toISOString(), endDate: new Date(formData.endDate).toISOString()}),
+        body: JSON.stringify({
+          ...formData,
+          startDate: new Date(formData.startDate).toISOString(),
+          endDate: new Date(formData.endDate).toISOString(),
+          votingMethod: "Single Choice",
+          maxVotes: 1
+        }),
       });
 
       const data = await response.json();
@@ -205,7 +207,7 @@ const Elections = () => {
       // Reset form and go to list
       setFormData({
         name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "",
-        startDate: "", endDate: "", votingMethod: "Single Choice", maxVotes: 1,
+        startDate: "", endDate: "",
         biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "",
       });
       setEditingId(null);
@@ -311,7 +313,6 @@ const Elections = () => {
       scopeDepartment: el.type === "Departmental" ? el.scope : "",
       scopeLevel: "",
       startDate: toDateTimeLocal(el.startDate), endDate: toDateTimeLocal(el.endDate),
-      votingMethod: el.votingMethod, maxVotes: el.maxVotes,
       biometricEnforced: el.biometricEnforced, realTimeMonitoring: el.realTimeMonitoring, eligibilityRules: el.eligibilityRules,
     });
     setEditingId(el.id);
@@ -512,7 +513,7 @@ const Elections = () => {
                 {editingId ? <Edit className="w-5 h-5 text-primary" /> : <Plus className="w-5 h-5 text-primary" />}
                 <h2 className="text-xl font-semibold text-foreground">{editingId ? "Edit Election" : "Create New Election"}</h2>
               </div>
-              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", votingMethod: "Single Choice", maxVotes: 1, biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} className="text-muted-foreground hover:text-foreground transition-colors">
+              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -604,22 +605,6 @@ const Elections = () => {
                   <input type="datetime-local" value={formData.endDate} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="admin-input h-12 px-4 text-sm" />
                 </div>
-                {/* Voting Method */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Voting Method</label>
-                  <select value={formData.votingMethod} onChange={(e) => setFormData({ ...formData, votingMethod: e.target.value })}
-                    className="admin-input h-12 px-4 text-sm appearance-none">
-                    <option value="Single Choice">Single Choice</option>
-                    <option value="Multiple Choice">Multiple Choice</option>
-                  </select>
-                </div>
-                {/* Max Votes */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Max Votes Allowed</label>
-                  <input type="number" min={1} value={formData.maxVotes} onChange={(e) => setFormData({ ...formData, maxVotes: Number(e.target.value) })}
-                    className="admin-input h-12 px-4 text-sm" />
-                </div>
-                {/* Eligibility */}
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Voter Eligibility Rules</label>
                   <input value={formData.eligibilityRules} onChange={(e) => setFormData({ ...formData, eligibilityRules: e.target.value })} placeholder="e.g. Only 300 Level Students"
@@ -653,7 +638,7 @@ const Elections = () => {
             )}
 
             <div className="flex gap-3 mt-8 pt-6 border-t border-border/20">
-              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", votingMethod: "Single Choice", maxVotes: 1, biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
+              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
               <button onClick={handleCreateSubmit} disabled={isSubmitting}
                 className="admin-btn-primary px-6 py-2.5 text-sm font-medium transition-all duration-300 hover:scale-[1.01] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
                 {isSubmitting ? "Saving..." : (editingId ? "Update Election" : "Create Election")}
@@ -718,8 +703,6 @@ const Elections = () => {
                     ["Scope", selectedElection.scope],
                     ["Start Date", selectedElection.startDate],
                     ["End Date", selectedElection.endDate],
-                    ["Voting Method", selectedElection.votingMethod],
-                    ["Max Votes", selectedElection.maxVotes.toString()],
                     ["Eligibility", selectedElection.eligibilityRules],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between">
