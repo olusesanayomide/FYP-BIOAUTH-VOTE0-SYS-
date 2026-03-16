@@ -33,7 +33,7 @@ interface AuditLog {
 }
 
 const parseDetails = (details: any) => {
-  if (!details) return {};
+  if (!details) return null;
   if (typeof details === "object") return details;
   if (typeof details === "string") {
     try {
@@ -440,7 +440,13 @@ const AuditTrailPage = () => {
               <div className="mt-5">
                 <p className="text-xs text-muted-foreground tracking-wide uppercase mb-2">Details</p>
                 <pre className="max-h-64 overflow-auto rounded-lg bg-muted/30 p-3 text-[11px] text-foreground whitespace-pre-wrap break-words">
-                  {JSON.stringify(parseDetails(selectedLog.details), null, 2)}
+                  {(() => {
+                    const parsed = parseDetails(selectedLog.details);
+                    if (!parsed || (typeof parsed === "object" && Object.keys(parsed).length === 0)) {
+                      return "No details provided for this event.";
+                    }
+                    return JSON.stringify(parsed, null, 2);
+                  })()}
                 </pre>
               </div>
             </motion.div>
@@ -452,4 +458,3 @@ const AuditTrailPage = () => {
 };
 
 export default AuditTrailPage;
-
