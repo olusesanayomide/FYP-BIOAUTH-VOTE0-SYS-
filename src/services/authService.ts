@@ -354,12 +354,12 @@ export const checkAdminStatus = async (email: string): Promise<ApiResponse<{ adm
     const response = await apiClient.post('/auth/admin/status', { email });
     // Map backend structure to frontend expectation
     if (response.data && response.data.data) {
-      const { id, webauthn_registered } = response.data.data;
+      const { adminId, isRegistered } = response.data.data;
       return {
         success: true,
         data: {
-          adminId: id,
-          isRegistered: webauthn_registered
+          adminId,
+          isRegistered
         }
       };
     }
