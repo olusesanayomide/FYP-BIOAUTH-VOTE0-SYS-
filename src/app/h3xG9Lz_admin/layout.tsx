@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Lovable App",
-    description: "Lovable Generated Project",
+    title: "(Admin) Online Biometric Voting System",
+    description: "An Online voting system secured by Biometrics",
 };
 
 export default function RootLayout({

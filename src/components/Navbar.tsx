@@ -17,7 +17,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isNavigatingToLogin, setIsNavigatingToLogin] = useState(false);
-  const [systemName, setSystemName] = useState("SecureVote");
+  const [systemName, setSystemName] = useState("");
   const [systemLogo, setSystemLogo] = useState("");
   const router = useRouter();
 

@@ -223,7 +223,7 @@ const Login = () => {
           <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
             <Shield className="w-4 h-4 text-primary" />
           </div>
-          <span className="text-sm font-semibold text-foreground">SecureVote</span>
+          <span className="text-sm font-semibold text-foreground">Securee</span>
         </motion.div>
 
         <motion.div

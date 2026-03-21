@@ -4,7 +4,7 @@ import { Analytics } from '@vercel/analytics/next';
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
-  title: "VOTE-CORE | Secure Voter Dashboard",
+  title: "Online Biometric Voting System",
   description: "Secure voting with biometric verification",
   icons: {
     icon: [
