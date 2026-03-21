@@ -544,7 +544,7 @@ const Elections = () => {
                     })
                   }}
                     className="admin-input h-12 px-4 text-sm appearance-none">
-                    <option value="Presidential">Presidential</option>
+                    <option value="Presidential">General</option>
                     <option value="Faculty">Faculty</option>
                     <option value="Departmental">Departmental</option>
                   </select>
