@@ -39,7 +39,7 @@ export default function SettingsPage() {
   });
 
   // Admin creation state
-  const [newAdmin, setNewAdmin] = useState({ username: "", email: "", password: "" });
+  const [newAdmin, setNewAdmin] = useState({ username: "", email: "" });
   const [adminCreating, setAdminCreating] = useState(false);
   const [adminMessage, setAdminMessage] = useState({ text: "", type: "" });
 
@@ -97,11 +97,6 @@ export default function SettingsPage() {
     }
   };
 
-  const generatePassword = () => {
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
-    const retVal = Array.from({ length: 12 }, () => charset.charAt(Math.floor(Math.random() * charset.length))).join("");
-    setNewAdmin({ ...newAdmin, password: retVal });
-  };
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,8 +106,8 @@ export default function SettingsPage() {
     try {
       const resp = await createAdmin(newAdmin);
       if (resp.success) {
-        setAdminMessage({ text: "Administrator account created successfully", type: "success" });
-        setNewAdmin({ username: "", email: "", password: "" });
+        setAdminMessage({ text: "Administrator account created and setup link sent successfully", type: "success" });
+        setNewAdmin({ username: "", email: "" });
       } else {
         setAdminMessage({ text: (resp as any).error || "Failed to create administrator", type: "error" });
       }
@@ -257,30 +252,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium ml-1">Password</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
-                      <input
-                        required
-                        type="text"
-                        placeholder="Min 8 characters"
-                        value={newAdmin.password}
-                        onChange={e => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                        className="w-full h-10 pl-9 pr-4 rounded-xl bg-muted/30 border border-border/50 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={generatePassword}
-                      className="px-3 rounded-xl bg-muted/50 border border-border/50 hover:bg-muted/80 transition-all group"
-                      title="Generate Password"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-all" />
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {adminMessage.text && (
@@ -306,7 +277,7 @@ export default function SettingsPage() {
                 {[
                   "All new admins have full permissions by default.",
                   "Email addresses must be unique and institution-verified.",
-                  "Passwords are encrypted using bcrypt hashing.",
+                  "New admins must complete biometric setup via the emailed link.",
                   "Every management action is logged to the audit trail."
                 ].map((policy, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">

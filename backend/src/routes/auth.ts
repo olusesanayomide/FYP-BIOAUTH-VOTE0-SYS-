@@ -410,6 +410,7 @@ router.post('/admin/webauthn/verify-authentication', async (req: Request, res: R
  */
 router.post('/admin/login/request-otp', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log(`[DEBUG] /admin/login/request-otp body:`, req.body);
     const { adminId } = req.body;
 
     if (!adminId) {

@@ -1275,22 +1275,17 @@ export const importStudentData = async (
  */
 export const createAdmin = async (adminData: any, creatorId: string) => {
     try {
-        const { username, email, password } = adminData;
+        const { username, email } = adminData;
 
-        if (!username || !email || !password) {
-            throw new ApiError(400, 'Username, email, and password are required', 'VALIDATION_ERROR');
+        if (!username || !email) {
+            throw new ApiError(400, 'Username and email are required', 'VALIDATION_ERROR');
         }
-
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
 
         const { data, error } = await supabase
             .from('admin')
             .insert([{
                 username,
                 email,
-                password_hash: passwordHash,
                 can_manage_elections: true,
                 can_manage_users: true,
                 can_manage_candidates: true,
@@ -1320,9 +1315,21 @@ export const createAdmin = async (adminData: any, creatorId: string) => {
             })
         });
 
+        // 4. Automatically send setup link for biometric registration
+        let setupLinkSent = false;
+        try {
+            const { requestAdminSetupLink } = await import('./authService');
+            await requestAdminSetupLink(email);
+            setupLinkSent = true;
+        } catch (linkError) {
+            console.error('[AdminService] Admin created but failed to send setup link:', linkError);
+        }
+
         return {
             success: true,
-            message: 'Admin account created successfully',
+            message: setupLinkSent 
+                ? 'Admin account created and setup link sent successfully' 
+                : 'Admin account created successfully (failed to send setup link)',
             data
         };
     } catch (error: any) {

@@ -461,3 +461,17 @@ export const verifyAdminWebauthnRegistration = async (adminId: string, response:
     };
   }
 };
+/**
+ * Verify Admin Setup Token
+ */
+export const verifyAdminSetupToken = async (token: string): Promise<ApiResponse<{ id: string; email: string; username: string }>> => {
+  try {
+    const response = await apiClient.post('/auth/admin/setup/verify', { token });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Invalid or expired setup token',
+    };
+  }
+};
