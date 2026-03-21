@@ -1289,6 +1289,8 @@ export const checkAdminStatus = async (email: string) => {
   if (!adminEmail) {
     throw new ApiError(400, 'Email is required', 'MISSING_FIELDS');
   }
+  
+  console.log(`DEBUG: Searching for admin email: "${adminEmail}" (Original: "${email}")`);
 
   const { data: admin, error } = await supabase
     .from('admin')
@@ -1297,6 +1299,7 @@ export const checkAdminStatus = async (email: string) => {
     .single();
 
   if (error || !admin) {
+    console.error("DEBUG checkAdminStatus Error:", error);
     throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
   }
 
