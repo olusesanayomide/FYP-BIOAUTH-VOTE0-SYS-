@@ -11,7 +11,6 @@ import Cookies from "js-cookie";
 
 type ElectionStatus = "ongoing" | "upcoming" | "completed" | "suspended";
 type ViewMode = "list" | "create" | "detail";
-
 interface Election {
   id: string;
   name: string;
@@ -21,6 +20,8 @@ interface Election {
   status: ElectionStatus;
   startDate: string;
   endDate: string;
+  rawStartDate: string;
+  rawEndDate: string;
   biometricEnforced: boolean;
   realTimeMonitoring: boolean;
   eligibilityRules: string;
@@ -120,6 +121,8 @@ const Elections = () => {
             status: mappedStatus,
             startDate: new Date(dbElection.start_time).toLocaleString(),
             endDate: new Date(dbElection.end_time).toLocaleString(),
+            rawStartDate: dbElection.start_time,
+            rawEndDate: dbElection.end_time,
             biometricEnforced: dbElection.biometric_enforced || false,
             realTimeMonitoring: dbElection.real_time_monitoring || false,
             eligibilityRules: dbElection.eligibility_rules || "All registered students",
@@ -728,8 +731,9 @@ const Elections = () => {
         {view === "detail" && selectedElection && (
           <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
             {(() => {
-              const end = new Date(selectedElection.endDate);
+              const end = new Date(selectedElection.rawEndDate);
               const canPublishResults = !isNaN(end.getTime()) && new Date() > end;
+              // Even if not strictly ended, let admins see/click it if they want, but maybe warn
               return (
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -788,11 +792,10 @@ const Elections = () => {
 
                 <button
                   onClick={() => handleResultsPublish(selectedElection.id, !selectedElection.resultsPublished)}
-                  disabled={!selectedElection.resultsPublished && !canPublishResults}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all ${selectedElection.resultsPublished
                     ? "text-muted-foreground bg-muted/30 border-border/40 hover:bg-muted/40"
                     : "text-primary bg-primary/5 border-primary/20 hover:bg-primary/10"
-                    } ${!selectedElection.resultsPublished && !canPublishResults ? "opacity-60 cursor-not-allowed hover:bg-primary/5" : ""}`}
+                    }`}
                 >
                   {selectedElection.resultsPublished ? "Hide Results" : "Publish Results"}
                 </button>
