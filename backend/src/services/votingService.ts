@@ -170,6 +170,7 @@ export const getElections = async (userIdStr?: string) => {
       type: election.type,
       eligible_voters: eligibleVoters,
       registeredVoters: eligibleVoters,
+      results_published: election.results_published === true,
       positions: Array.from(positionsMap.values()),
     };
   }));
@@ -648,8 +649,8 @@ export const getVotingResults = async (electionId: string) => {
   const endTime = election.end_time ? new Date(election.end_time) : null;
   const isEnded = endTime ? now > endTime : false;
   const isPublished = election.results_published === true;
-  if (!isPublished && !isEnded) {
-    throw new ApiError(403, 'Results are not available yet', 'RESULTS_NOT_PUBLISHED');
+  if (!isPublished) {
+    throw new ApiError(403, 'Results are not available yet. The electoral committee has not officially published the final tallies.', 'RESULTS_NOT_PUBLISHED');
   }
 
   const positionsMap = new Map();
