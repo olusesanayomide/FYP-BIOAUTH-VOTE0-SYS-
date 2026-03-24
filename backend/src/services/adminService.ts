@@ -4,6 +4,8 @@ import { createBroadcastForRole, createNotification } from './notificationServic
 import bcrypt from 'bcryptjs';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
+import PDFDocument from 'pdfkit';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, VerticalAlign, BorderStyle } from 'docx';
 
 /**
  * Retrieves high-level dashboard metrics for the Admin Command Center
@@ -1311,29 +1313,48 @@ export const updateSystemSettings = async (settingsArray: { key: string, value: 
  */
 export const getAuditLogs = async () => {
     try {
-        const { data, error } = await supabase
+        // Step 1: Fetch raw audit logs
+        const { data: logs, error: logsError } = await supabase
             .from('audit_logs')
-            .select(`
-                *,
-                admin:admin_id (username, email)
-            `)
+            .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('getAuditLogs Error fetching from DB:', error);
-            throw new ApiError(500, 'Failed to retrieve audit logs');
+        if (logsError) {
+            console.error('getAuditLogs Step 1 Error:', logsError);
+            throw new ApiError(500, `Failed to retrieve audit logs: ${logsError.message}`);
+        }
+
+        if (!logs || logs.length === 0) {
+            return { success: true, data: [] };
+        }
+
+        // Step 2: Fetch unique admin details to avoid large joins if it's an SSL issue
+        const adminIds = [...new Set(logs.map(l => l.admin_id).filter(Boolean))];
+        const adminMap: Record<string, any> = {};
+
+        if (adminIds.length > 0) {
+            const { data: admins, error: adminsError } = await supabase
+                .from('admin')
+                .select('id, username, email')
+                .in('id', adminIds);
+
+            if (!adminsError && admins) {
+                admins.forEach(a => { adminMap[a.id] = a; });
+            }
         }
 
         return {
             success: true,
-            data: (data || []).map(log => ({
+            data: logs.map(log => ({
                 ...log,
-                admin_name: log.admin?.username || 'System'
+                admin: log.admin_id ? adminMap[log.admin_id] : null,
+                admin_name: (log.admin_id && adminMap[log.admin_id]?.username) || 'System'
             }))
         };
     } catch (error: any) {
+        console.error('getAuditLogs Unexpected Error:', error);
         if (error instanceof ApiError) throw error;
-        throw new ApiError(500, 'Unexpected error fetching audit logs');
+        throw new ApiError(500, `Unexpected error fetching audit logs: ${error.message}`);
     }
 };
 
@@ -1637,4 +1658,250 @@ export const exportAuditLogs = async (format: string, filterAdminId?: string) =>
         if (error instanceof ApiError) throw error;
         throw new ApiError(500, 'Failed to export audit logs', 'DATABASE_ERROR');
     }
+};/**
+ * Exports detailed election results as PDF or Word document
+ */
+export const exportElectionResults = async (electionId: string, format: string) => {
+    try {
+        // 1. Fetch all necessary data
+        // 1.1 Fetch Election & System Settings
+        const { data: election, error: electionError } = await supabase
+            .from('elections')
+            .select('*')
+            .eq('id', electionId)
+            .single();
+
+        if (electionError || !election) throw new ApiError(404, 'Election not found');
+
+        const { data: settings } = await supabase.from('system_settings').select('*').single();
+        const institutionName = settings?.university_name || 'Institution Name';
+
+        // 1.2 Fetch Candidates & their vote counts
+        const { data: candidates, error: candidatesError } = await supabase
+            .from('candidates')
+            .select(`
+                *,
+                votes:votes(count)
+            `)
+            .eq('election_id', electionId);
+
+        if (candidatesError) throw candidatesError;
+
+        // 1.3 Fetch Voter Analytics (using existing logic or similar)
+        let usersQuery = supabase.from('users').select('id, registration_completed, faculty, department, level', { count: 'exact' }).eq('role', 'VOTER');
+        if (election.type === 'Faculty' || election.type === 'Departmental') {
+            if (election.scope_faculty && election.scope_faculty !== 'All' && election.scope_faculty !== 'University-Wide') {
+                usersQuery = usersQuery.eq('faculty', election.scope_faculty);
+            }
+            if (election.type === 'Departmental' && election.scope_department && election.scope_department !== 'All' && election.scope_department !== 'University-Wide') {
+                usersQuery = usersQuery.eq('department', election.scope_department);
+            }
+        }
+        const { data: votersInScope } = await usersQuery;
+        const totalEligible = votersInScope?.length || 0;
+        const totalVerifiedVoters = votersInScope?.filter(u => u.registration_completed).length || 0;
+
+        // 1.4 Fetch actual votes cast
+        const { data: votes, error: votesError } = await supabase
+            .from('votes')
+            .select('voter_id, webauthn_verified, selected_candidate_id')
+            .eq('election_id', electionId);
+
+        if (votesError) throw votesError;
+
+        const uniqueVoters = new Set((votes || []).map(r => r.voter_id));
+        const totalVotesCast = uniqueVoters.size;
+        const biometricVerifiedVotes = (votes || []).filter(v => v.webauthn_verified).length;
+        const turnoutRate = totalEligible > 0 ? (totalVotesCast / totalEligible) * 100 : 0;
+
+        // 2. Prepare Report Data
+        const reportData = {
+            institutionName,
+            electionTitle: election.title,
+            date: new Date().toLocaleDateString(),
+            purpose: election.description || 'General Election',
+            method: election.biometric_enforced ? 'Biometric Online Voting (WebAuthn)' : 'Online Voting (OTP/Fallback)',
+            totalParticipation: totalVotesCast,
+            turnoutRate: turnoutRate.toFixed(2) + '%',
+            totalEligible,
+            totalVerifiedVoters,
+            biometricVerifiedVotes,
+            biometricToggled: election.biometric_enforced,
+            candidates: (candidates || []).map(c => {
+                const voteCount = (votes || []).filter(v => v.selected_candidate_id === c.id).length;
+                return {
+                    name: c.name,
+                    position: c.position,
+                    votes: voteCount,
+                    percentage: totalVotesCast > 0 ? ((voteCount / totalVotesCast) * 100).toFixed(2) : '0'
+                };
+            }).sort((a, b) => b.votes - a.votes)
+        };
+
+        // 3. Generate Report based on format
+        if (format.toLowerCase() === 'pdf') {
+            return await generatePDFReport(reportData);
+        } else {
+            return await generateWordReport(reportData);
+        }
+
+    } catch (error: any) {
+        console.error('Export election results error:', error);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, `Failed to export election results: ${error.message}`);
+    }
+};
+
+/**
+ * Helper to generate PDF Report using PDFKit
+ */
+const generatePDFReport = async (data: any): Promise<{ buffer: Buffer, contentType: string, fileName: string }> => {
+    return new Promise((resolve) => {
+        const doc = new PDFDocument({ margin: 50 });
+        const chunks: any[] = [];
+
+        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('end', () => {
+            const result = Buffer.concat(chunks);
+            resolve({
+                buffer: result,
+                contentType: 'application/pdf',
+                fileName: `${data.electionTitle.replace(/\s+/g, '_')}_Report.pdf`
+            });
+        });
+
+        // 1. Title Page
+        doc.fontSize(24).text(data.institutionName, { align: 'center' });
+        doc.moveDown(1);
+        doc.fontSize(20).text(data.electionTitle, { align: 'center' });
+        doc.moveDown(2);
+        doc.fontSize(14).text(`Date: ${data.date}`, { align: 'center' });
+        doc.moveDown(0.5);
+        doc.text('Prepared by: Electoral Committee System', { align: 'center' });
+        
+        doc.addPage();
+
+        // 2. Executive Summary
+        doc.fontSize(18).text('1. Executive Summary', { underline: true });
+        doc.moveDown(1);
+        doc.fontSize(12).text(`Purpose: ${data.purpose}`, { lineGap: 5 });
+        doc.text(`Method: ${data.method}`, { lineGap: 5 });
+        doc.text(`Total Participation: ${data.totalParticipation} voters`, { lineGap: 5 });
+        doc.text(`Turnout Rate: ${data.turnoutRate}`, { lineGap: 5 });
+        
+        const winner = data.candidates[0];
+        doc.moveDown(1);
+        doc.text(`Primary Outcome: ${winner ? `${winner.name} led with ${winner.votes} votes (${winner.percentage}%)` : 'No votes recorded'}.`);
+
+        doc.moveDown(2);
+
+        // 3. Voter Statistics
+        doc.fontSize(18).text('2. Voter Statistics', { underline: true });
+        doc.moveDown(1);
+        doc.fontSize(12);
+        doc.text(`Total Eligible Voters: ${data.totalEligible}`);
+        doc.text(`Total Votes Cast: ${data.totalParticipation}`);
+        doc.text(`Turnout Percentage: ${data.turnoutRate}`);
+        doc.text(`Biometric (WebAuthn) Verified Votes: ${data.biometricVerifiedVotes}`);
+        doc.text(`Biometric Enforcement Status: ${data.biometricToggled ? 'ON' : 'OFF'}`);
+
+        doc.moveDown(2);
+
+        // 4. Candidate Performance (Bar Chart Simulation)
+        doc.fontSize(18).text('3. Candidate Performance', { underline: true });
+        doc.moveDown(1);
+
+        const chartX = 100;
+        let startY = doc.y;
+        const maxBarWidth = 350;
+
+        data.candidates.forEach((c: any, index: number) => {
+            doc.fontSize(10).text(c.name, chartX - 50, startY + 5, { width: 45, align: 'right' });
+            
+            const barWidth = (parseFloat(c.percentage) / 100) * maxBarWidth;
+            doc.rect(chartX, startY, barWidth, 15).fill('#0ea5e9'); // primary color
+            
+            doc.fillColor('black').text(`${c.votes} (${c.percentage}%)`, chartX + barWidth + 5, startY + 5);
+            startY += 25;
+
+            // Page break check
+            if (startY > 700) {
+                doc.addPage();
+                startY = 50;
+            }
+        });
+
+        doc.end();
+    });
+};
+
+/**
+ * Helper to generate Word Report using docx
+ */
+const generateWordReport = async (data: any): Promise<{ buffer: Buffer, contentType: string, fileName: string }> => {
+    const doc = new Document({
+        sections: [
+            {
+                properties: {},
+                children: [
+                    // Title Page
+                    new Paragraph({ text: data.institutionName, heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                    new Paragraph({ text: data.electionTitle, heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
+                    new Paragraph({ text: `Date: ${data.date}`, alignment: AlignmentType.CENTER }),
+                    new Paragraph({ text: 'Prepared by: Electoral Committee System', alignment: AlignmentType.CENTER }),
+                    
+                    new Paragraph({ text: "", spacing: { before: 400, after: 400 } }), // Spacer
+
+                    // Executive Summary
+                    new Paragraph({ text: "1. Executive Summary", heading: HeadingLevel.HEADING_2 }),
+                    new Paragraph({ children: [new TextRun({ text: "Purpose: ", bold: true }), new TextRun(data.purpose)] }),
+                    new Paragraph({ children: [new TextRun({ text: "Method: ", bold: true }), new TextRun(data.method)] }),
+                    new Paragraph({ children: [new TextRun({ text: "Total Participation: ", bold: true }), new TextRun(`${data.totalParticipation} voters`)] }),
+                    new Paragraph({ children: [new TextRun({ text: "Turnout Rate: ", bold: true }), new TextRun(data.turnoutRate)] }),
+
+                    new Paragraph({ text: "", spacing: { before: 400 } }),
+
+                    // Voter Statistics
+                    new Paragraph({ text: "2. Voter Statistics", heading: HeadingLevel.HEADING_2 }),
+                    new Paragraph({ text: `Total Eligible Voters: ${data.totalEligible}` }),
+                    new Paragraph({ text: `Total Votes Cast: ${data.totalParticipation}` }),
+                    new Paragraph({ text: `Turnout Percentage: ${data.turnoutRate}` }),
+                    new Paragraph({ text: `Biometric Verified Votes: ${data.biometricVerifiedVotes}` }),
+
+                    new Paragraph({ text: "", spacing: { before: 400 } }),
+
+                    // Results Table
+                    new Paragraph({ text: "3. Candidate Performance", heading: HeadingLevel.HEADING_2 }),
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Candidate", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Position", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Votes", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Percentage", bold: true })] })] }),
+                                ]
+                            }),
+                            ...data.candidates.map((c: any) => new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph(c.name)] }),
+                                    new TableCell({ children: [new Paragraph(c.position)] }),
+                                    new TableCell({ children: [new Paragraph(c.votes.toString())] }),
+                                    new TableCell({ children: [new Paragraph(`${c.percentage}%`)] }),
+                                ]
+                            }))
+                        ]
+                    })
+                ]
+            }
+        ]
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+    return {
+        buffer,
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        fileName: `${data.electionTitle.replace(/\s+/g, '_')}_Report.docx`
+    };
 };

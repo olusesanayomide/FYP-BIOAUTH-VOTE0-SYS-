@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { getDashboardStats, createElection, getAllElections, getAllCandidates, createCandidate, updateCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs } from '../services/adminService';
+import { getDashboardStats, createElection, getAllElections, getAllCandidates, createCandidate, updateCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs, exportElectionResults } from '../services/adminService';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -295,6 +295,26 @@ router.delete('/candidates/:id', async (req: Request, res: Response, next: NextF
         const adminId = (req as any).user.id;
         const result = await deleteCandidate(req.params.id, adminId);
         res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * @route   GET /admin/elections/:id/export
+ * @desc    Export election results as PDF or Word
+ * @access  Private (Admin only)
+ */
+router.get('/elections/:id/export', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const format = (req.query.format as string) || 'pdf';
+
+        const { buffer, contentType, fileName } = await exportElectionResults(id, format);
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.send(buffer);
     } catch (error) {
         next(error);
     }

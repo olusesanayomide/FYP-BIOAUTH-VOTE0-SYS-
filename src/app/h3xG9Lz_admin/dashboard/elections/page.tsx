@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Vote, Plus, Eye, Edit, PauseCircle, Archive, Activity, Clock, CheckCircle2,
-  AlertTriangle, X, Calendar, Users, Shield, Fingerprint, BarChart3, Ban, Search, PlayCircle, Trash
+  AlertTriangle, X, Calendar, Users, Shield, Fingerprint, BarChart3, Ban, Search, PlayCircle, Trash, Download, FileText, FileCode
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import Cookies from "js-cookie";
@@ -70,6 +70,8 @@ const Elections = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isExporting, setIsExporting] = useState<"pdf" | "docx" | null>(null);
+  const [showExportOptions, setShowExportOptions] = useState(false);
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = Cookies.get("admin_token");
@@ -348,6 +350,35 @@ const Elections = () => {
     });
     setEditingId(el.id);
     setView("create");
+  };
+
+  const handleExport = async (format: "pdf" | "docx") => {
+    if (!selectedElection) return;
+    setIsExporting(format);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/admin/elections/${selectedElection.id}/export?format=${format}`, {
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) throw new Error("Failed to generate report");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${selectedElection.name.replace(/\s+/g, "_")}_Result.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export failed", error);
+      alert("Failed to export election report. Please try again.");
+    } finally {
+      setIsExporting(null);
+      setShowExportOptions(false);
+    }
   };
 
   return (
@@ -708,12 +739,53 @@ const Elections = () => {
                   {statusConfig[selectedElection.status].label}
                 </span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 relative">
                 {selectedElection.status === "ongoing" && (
                   <button onClick={() => setShowSuspendConfirm(selectedElection.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-warning bg-warning/5 hover:bg-warning/10 border border-warning/20 transition-all">
                     <PauseCircle className="w-4 h-4" /> Suspend
                   </button>
                 )}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExportOptions(!showExportOptions)}
+                    disabled={isExporting !== null}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-foreground bg-muted/20 border border-border/40 hover:bg-muted/30 transition-all disabled:opacity-50"
+                  >
+                    {isExporting ? (
+                      <div className="w-4 h-4 rounded-full border-t-2 border-primary animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Export Result
+                  </button>
+
+                  <AnimatePresence>
+                    {showExportOptions && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute right-0 top-full mt-2 w-48 admin-card rounded-xl border border-border/40 shadow-xl z-50 overflow-hidden"
+                      >
+                        <button
+                          onClick={() => handleExport("pdf")}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-primary/5 transition-colors border-b border-border/10"
+                        >
+                          <FileText className="w-4 h-4 text-primary" />
+                          <span>Professional PDF</span>
+                        </button>
+                        <button
+                          onClick={() => handleExport("docx")}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-primary/5 transition-colors"
+                        >
+                          <FileCode className="w-4 h-4 text-blue-500" />
+                          <span>Microsoft Word</span>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 <button
                   onClick={() => handleResultsPublish(selectedElection.id, !selectedElection.resultsPublished)}
                   disabled={!selectedElection.resultsPublished && !canPublishResults}
