@@ -4,8 +4,8 @@ import { Bell, CheckCircle2, Clock, LogOut, Menu, Settings, User, XCircle } from
 import { useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { getSystemSettings } from "@/services/adminService"
-import { getElections } from "@/services/votingService"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { getNotifications, markAllNotificationsRead, clearReadNotifications } from "@/services/notificationService"
 
 interface TopNavProps {
   onToggleSidebar: () => void
@@ -90,95 +90,44 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
 
     const fetchNotifications = async () => {
       const items: TopNavNotification[] = []
-      const now = new Date()
-
       try {
-        const resp = await getElections()
+        const resp = await getNotifications(20)
         if (resp.success && resp.data) {
-          const current = now.getTime()
-          const ongoing = resp.data.filter((e) => {
-            const s = new Date(e.startDate).getTime()
-            const en = new Date(e.endDate).getTime()
-            return current >= s && current <= en
-          })
-
-          const upcoming = resp.data
-            .filter((e) => new Date(e.startDate).getTime() > current)
-            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-          if (ongoing.length > 0) {
-            items.push({
-              id: "ongoing-elections",
-              title: "Election in progress",
-              description: `${ongoing.length} active election${ongoing.length > 1 ? "s" : ""} available now.`,
-              type: "success",
-              time: "Now",
-              isRead: false,
-              category: "election",
+          const prefs = getNotifPrefs()
+          const mapped = resp.data
+            .filter((n) => {
+              if (n.category === "election" && !prefs.electionAlerts) return false
+              if (n.category === "results" && !prefs.resultAnnouncements) return false
+              return true
             })
-          }
+            .map((n) => ({
+              id: n.id,
+              title: n.title,
+              description: n.description,
+              type: n.type,
+              time: n.created_at ? new Date(n.created_at).toLocaleString() : "Just now",
+              isRead: n.isRead,
+              category: n.category,
+            }))
 
-          if (upcoming[0]) {
-            items.push({
-              id: `upcoming-${upcoming[0].id}`,
-              title: "Upcoming election",
-              description: `${upcoming[0].title} starts ${new Date(upcoming[0].startDate).toLocaleString()}.`,
-              type: "info",
-              time: "Upcoming",
-              isRead: false,
-              category: "election",
-            })
+          if (mapped.length > 0) {
+            setNotifications(mapped)
+            return
           }
         }
-      } catch (e) {
-        items.push({
-          id: "election-fetch-warning",
-          title: "Election updates unavailable",
-          description: "Unable to load election notifications right now.",
-          type: "warning",
-          time: "Just now",
-          isRead: false,
-          category: "system",
-        })
-      }
+      } catch (e) { }
 
-      if (userData) {
-        try {
-          const parsed = JSON.parse(userData)
-          if (parsed.biometricStatus !== "VERIFIED") {
-            items.push({
-              id: "verify-biometrics",
-              title: "Complete biometric verification",
-              description: "Verify biometrics to participate in restricted elections.",
-              type: "warning",
-              time: "Action needed",
-              isRead: false,
-              category: "verification",
-            })
-          }
-        } catch (e) { }
-      }
-
-      const prefs = getNotifPrefs()
-      const filtered = items.filter((n) => {
-        if (n.category === "election" && !prefs.electionAlerts) return false
-        if (n.category === "results" && !prefs.resultAnnouncements) return false
-        return true
+      items.push({
+        id: "all-clear",
+        title: "No new alerts",
+        description: "You are all caught up.",
+        type: "info",
+        time: "Now",
+        isRead: true,
+        category: "system",
       })
 
-      if (filtered.length === 0) {
-        items.push({
-          id: "all-clear",
-          title: "No new alerts",
-          description: "You are all caught up.",
-          type: "info",
-          time: "Now",
-          isRead: true,
-          category: "system",
-        })
-      }
-
-      setNotifications(filtered.length > 0 ? filtered : items)
+      setNotifications(items)
     }
 
     fetchSettings()
@@ -199,8 +148,14 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications])
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
+    await markAllNotificationsRead()
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+  }
+
+  const clearRead = async () => {
+    await clearReadNotifications()
+    setNotifications((prev) => prev.filter((n) => !n.isRead))
   }
 
   const openDashboardView = (view: "history" | "settings") => {
@@ -262,7 +217,6 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
             onClick={() => {
               setShowNotifMenu((v) => !v)
               setShowProfileMenu(false)
-              markAllRead()
             }}
             className="group relative rounded-lg p-2 text-muted-foreground transition-all duration-200 hover:bg-secondary/10 hover:text-secondary"
             aria-label="Notifications"
@@ -278,11 +232,14 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
             <div className="absolute right-0 mt-2 w-[340px] rounded-xl border border-border/60 bg-card/95 shadow-xl backdrop-blur-md z-[120]">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border/40">
                 <p className="text-xs font-semibold text-foreground">Notifications</p>
-                <button onClick={markAllRead} className="text-[11px] text-primary hover:underline">Mark all read</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={markAllRead} className="text-[11px] text-primary hover:underline">Mark all read</button>
+                  <button onClick={clearRead} className="text-[11px] text-muted-foreground hover:underline">Clear read</button>
+                </div>
               </div>
               <div className="max-h-[320px] overflow-auto p-2 space-y-1">
                 {notifications.map((n) => (
-                  <div key={n.id} className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5">
+                  <div key={n.id} className={`rounded-lg border border-border/40 px-3 py-2.5 ${n.isRead ? "bg-muted/10 opacity-70" : "bg-muted/20"}`}>
                     <div className="flex items-start gap-2">
                       {n.type === "success" && <CheckCircle2 className="h-4 w-4 text-success mt-0.5" />}
                       {n.type === "warning" && <XCircle className="h-4 w-4 text-warning mt-0.5" />}

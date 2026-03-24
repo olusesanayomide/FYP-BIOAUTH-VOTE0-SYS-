@@ -62,8 +62,9 @@ const Candidates = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [electionsConfig, setElectionsConfig] = useState<{ id: string, name: string }[]>([]);
+  const [electionsConfig, setElectionsConfig] = useState<{ id: string, name: string, status: "ongoing" | "upcoming" | "completed" | "suspended" }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form states
   const [form, setForm] = useState({
@@ -80,6 +81,8 @@ const Candidates = () => {
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [manifesto, setManifesto] = useState<File | null>(null);
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string>("");
+  const [existingManifestoUrl, setExistingManifestoUrl] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -110,7 +113,16 @@ const Candidates = () => {
       const elRes = await fetch(`${apiUrl}/admin/elections`, { headers: getAuthHeaders() });
       const elData = await safeJson(elRes);
       if (elData.success) {
-        setElectionsConfig(elData.data.map((e: any) => ({ id: e.id, name: e.title })));
+        const now = new Date();
+        setElectionsConfig(elData.data.map((e: any) => {
+          const start = new Date(e.start_time);
+          const end = new Date(e.end_time);
+          let status: "ongoing" | "upcoming" | "completed" | "suspended" = "upcoming";
+          if (e.status === "suspended") status = "suspended";
+          else if (!isNaN(end.getTime()) && now > end) status = "completed";
+          else if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && now >= start && now <= end) status = "ongoing";
+          return { id: e.id, name: e.title, status };
+        }));
       }
 
       // Fetch Candidates
@@ -152,9 +164,16 @@ const Candidates = () => {
     setSubmitError("");
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const allowedElectionIds = new Set(
+        electionsConfig.filter(e => e.status === "ongoing" || e.status === "upcoming").map(e => e.id)
+      );
+      const editingAllowsCurrent = Boolean(editingId && form.electionId && !allowedElectionIds.has(form.electionId));
+      if (!allowedElectionIds.has(form.electionId) && !editingAllowsCurrent) {
+        throw new Error("Please select an ongoing or upcoming election.");
+      }
 
-      let photoUrl = "";
-      let manifestoUrl = "";
+      let photoUrl = existingPhotoUrl;
+      let manifestoUrl = existingManifestoUrl;
 
       // Upload Photo if exists
       if (photo) {
@@ -200,8 +219,11 @@ const Candidates = () => {
         manifestoUrl = publicUrl;
       }
 
-      const response = await fetch(`${apiUrl}/admin/candidates`, {
-        method: "POST",
+      const url = editingId ? `${apiUrl}/admin/candidates/${editingId}` : `${apiUrl}/admin/candidates`;
+      const method = editingId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({
           ...form,
@@ -216,20 +238,7 @@ const Candidates = () => {
       }
 
       // Reset form and go to list
-      setForm({
-        name: "",
-        position: "",
-        studentId: "",
-        email: "",
-        bio: "",
-        faculty: "",
-        department: "",
-        level: "",
-        electionId: "",
-        status: "pending" as CandidateStatus
-      });
-      setPhoto(null);
-      setManifesto(null);
+      resetForm();
       fetchInitialData(); // Re-hydrate list
       setView("list");
     } catch (error: any) {
@@ -309,7 +318,53 @@ const Candidates = () => {
     }
   };
 
+  const openEdit = (candidate: Candidate) => {
+    setForm({
+      name: candidate.name,
+      position: candidate.position,
+      studentId: candidate.studentId,
+      email: candidate.email,
+      bio: candidate.bio || "",
+      faculty: candidate.faculty || "",
+      department: candidate.department || "",
+      level: candidate.level || "",
+      electionId: candidate.electionId,
+      status: candidate.status
+    });
+    setExistingPhotoUrl(candidate.photoUrl || "");
+    setExistingManifestoUrl(candidate.manifestoUrl || "");
+    setPhoto(null);
+    setManifesto(null);
+    setEditingId(candidate.id);
+    setView("add");
+  };
+
+  const resetForm = () => {
+    setForm({
+      name: "",
+      position: "",
+      studentId: "",
+      email: "",
+      bio: "",
+      faculty: "",
+      department: "",
+      level: "",
+      electionId: "",
+      status: "pending" as CandidateStatus
+    });
+    setPhoto(null);
+    setManifesto(null);
+    setExistingPhotoUrl("");
+    setExistingManifestoUrl("");
+    setEditingId(null);
+  };
+
   const electionNames = Array.from(new Set(electionsConfig.map((e) => e.name)));
+  const allowedElections = electionsConfig.filter(e => e.status === "ongoing" || e.status === "upcoming");
+  const currentElection = editingId ? electionsConfig.find(e => e.id === form.electionId) : null;
+  const electionOptions = currentElection && !allowedElections.some(e => e.id === currentElection.id)
+    ? [...allowedElections, currentElection]
+    : allowedElections;
   const filtered = candidates.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.studentId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesElection = filterElection === "all" || c.electionName === filterElection;
@@ -330,7 +385,7 @@ const Candidates = () => {
                 <h2 className="text-xl font-semibold text-foreground">Candidates</h2>
               </div>
               <button
-                onClick={() => setView("add")}
+                onClick={() => { resetForm(); setView("add"); }}
                 className="admin-btn-primary px-4 py-2.5 text-sm font-medium shadow-[0_8px_20px_-14px_hsl(var(--primary)/0.55)]"
               >
                 <Plus className="w-4 h-4" /> Add Candidate
@@ -399,6 +454,7 @@ const Candidates = () => {
                             <td className="px-4 py-3">
                               <div className="flex gap-1 items-center">
                                 <button onClick={() => { setSelected(c); setView("detail"); }} className="p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all" title="View Details"><Eye className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => openEdit(c)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all" title="Edit Candidate"><Edit className="w-3.5 h-3.5" /></button>
 
                                 {c.status !== "approved" && (
                                   <button onClick={() => handleStatusChange(c.id, "approved")} className="p-1.5 rounded text-muted-foreground hover:text-success hover:bg-success/5 transition-all" title="Approve"><CheckCircle2 className="w-3.5 h-3.5" /></button>
@@ -435,10 +491,10 @@ const Candidates = () => {
           <motion.div key="add" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <Plus className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold text-foreground">Add Candidate</h2>
+                {editingId ? <Edit className="w-5 h-5 text-primary" /> : <Plus className="w-5 h-5 text-primary" />}
+                <h2 className="text-xl font-semibold text-foreground">{editingId ? "Edit Candidate" : "Add Candidate"}</h2>
               </div>
-              <button onClick={() => setView("list")} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-5 h-5" /></button>
+              <button onClick={() => { resetForm(); setView("list"); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="glass-card rounded-2xl p-8 max-w-3xl">
@@ -506,10 +562,15 @@ const Candidates = () => {
                   <select value={form.electionId} onChange={(e) => setForm({ ...form, electionId: e.target.value })}
                     className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none">
                     <option value="">Select Election</option>
-                    {electionsConfig.map((ec) => (
-                      <option key={ec.id} value={ec.id}>{ec.name}</option>
+                    {electionOptions.map((ec) => (
+                      <option key={ec.id} value={ec.id}>
+                        {ec.name} {ec.status === "ongoing" ? "(Ongoing)" : ec.status === "upcoming" ? "(Upcoming)" : "(Completed)"}
+                      </option>
                     ))}
                   </select>
+                  {allowedElections.length === 0 && !editingId && (
+                    <p className="text-xs text-warning">No ongoing or upcoming elections are available for candidate assignment.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Approval Status</label>
@@ -527,7 +588,7 @@ const Candidates = () => {
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files && setPhoto(e.target.files[0])} />
                     <div className="text-center">
                       <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
-                      <p className="text-[10px] text-muted-foreground">{photo ? photo.name : "Click to upload"}</p>
+                      <p className="text-[10px] text-muted-foreground">{photo ? photo.name : (existingPhotoUrl ? "Current photo set" : "Click to upload")}</p>
                     </div>
                   </label>
                 </div>
@@ -537,7 +598,7 @@ const Candidates = () => {
                     <input type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files && setManifesto(e.target.files[0])} />
                     <div className="text-center">
                       <FileText className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
-                      <p className="text-[10px] text-muted-foreground">{manifesto ? manifesto.name : "Click to upload PDF"}</p>
+                      <p className="text-[10px] text-muted-foreground">{manifesto ? manifesto.name : (existingManifestoUrl ? "Current manifesto set" : "Click to upload PDF")}</p>
                     </div>
                   </label>
                 </div>
@@ -550,13 +611,13 @@ const Candidates = () => {
               )}
 
               <div className="flex gap-3 mt-8 pt-6 border-t border-border/20">
-                <button onClick={() => setView("list")} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
+                <button onClick={() => { resetForm(); setView("list"); }} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
                 <button
                   onClick={handleCreateSubmit}
                   disabled={isSubmitting}
                   className="admin-btn-primary px-6 py-2.5 text-sm font-medium transition-all duration-300 hover:scale-[1.02] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
                 >
-                  {isSubmitting ? "Adding..." : "Add Candidate"}
+                  {isSubmitting ? (editingId ? "Saving..." : "Adding...") : (editingId ? "Save Changes" : "Add Candidate")}
                 </button>
               </div>
             </div>

@@ -175,13 +175,32 @@ const Elections = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [dateServerError, setDateServerError] = useState("");
+
+  const dateValidationError = (() => {
+    if (!formData.startDate || !formData.endDate) return "";
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return "Start and end date must be valid.";
+    if (end <= start) return "End time must be later than start time.";
+    return "";
+  })();
 
   const handleCreateSubmit = async () => {
     setIsSubmitting(true);
     setSubmitError("");
+    setDateServerError("");
     try {
       if (!formData.name || !formData.startDate || !formData.endDate) {
         throw new Error("Election Name, Start Date, and End Date are required.");
+      }
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        throw new Error("Start and end date must be valid.");
+      }
+      if (end <= start) {
+        throw new Error("End time must be later than start time.");
       }
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const url = editingId ? `${apiUrl}/admin/elections/${editingId}` : `${apiUrl}/admin/elections`;
@@ -215,7 +234,11 @@ const Elections = () => {
       fetchElections();
       setView("list");
     } catch (error: any) {
-      setSubmitError(error.message);
+      const message = error.message || "Failed to create election";
+      setSubmitError(message);
+      if (message.toLowerCase().includes("end time") || message.toLowerCase().includes("start and end")) {
+        setDateServerError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -260,6 +283,14 @@ const Elections = () => {
   const handleDelete = async (id: string, name: string) => {
     setDeleteTarget({ id, name });
     setShowDeleteConfirm(true);
+  };
+
+  const isElectionOngoingByTime = (startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+    const now = new Date();
+    return now >= start && now <= end;
   };
 
   const handleResultsPublish = async (id: string, publish: boolean) => {
@@ -390,6 +421,7 @@ const Elections = () => {
                   ).map((el, i) => {
                     const cfg = statusConfig[el.status];
                     const progress = el.registeredVoters > 0 ? Math.round((el.votesCast / el.registeredVoters) * 100) : 0;
+                    const ongoingByTime = isElectionOngoingByTime(el.startDate, el.endDate);
                     return (
                       <motion.div
                         key={el.id}
@@ -408,7 +440,7 @@ const Elections = () => {
                           <span className="text-[10px] text-muted-foreground">{el.id}</span>
                         </div>
                         <h4 className="text-sm font-medium text-foreground mb-1">{el.name}</h4>
-                        <p className="text-xs text-muted-foreground mb-3">{el.type} â€¢ {el.scope}</p>
+                        <p className="text-xs text-muted-foreground mb-3">{el.type} - {el.scope}</p>
                         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-4">
                           <span>Start: {el.startDate}</span>
                           <span>End: {el.endDate}</span>
@@ -424,7 +456,7 @@ const Elections = () => {
                             transition={{ duration: 1.2, ease: "easeOut" }}
                           />
                         </div>
-                        <p className="text-[10px] text-muted-foreground">{progress}% turnout â€¢ {el.votesCast.toLocaleString()} votes cast</p>
+                        <p className="text-[10px] text-muted-foreground">{progress}% turnout - {el.votesCast.toLocaleString()} votes cast</p>
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/20">
@@ -451,7 +483,18 @@ const Elections = () => {
                               <PlayCircle className="w-3 h-3" /> Resume
                             </button>
                           )}
-                          <button onClick={() => handleDelete(el.id, el.name)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all ml-auto" title="Delete Election">
+                          <button
+                            onClick={() => {
+                              if (ongoingByTime) return;
+                              handleDelete(el.id, el.name);
+                            }}
+                            disabled={ongoingByTime}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all ml-auto ${ongoingByTime
+                              ? "text-muted-foreground/50 cursor-not-allowed"
+                              : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              }`}
+                            title={ongoingByTime ? "Cannot delete an ongoing election" : "Delete Election"}
+                          >
                             <Trash className="w-3 h-3" /> Delete
                           </button>
                         </div>
@@ -602,8 +645,11 @@ const Elections = () => {
                 {/* End Date */}
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">End Date & Time</label>
-                  <input type="datetime-local" value={formData.endDate} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  <input type="datetime-local" value={formData.endDate} min={formData.startDate || undefined} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="admin-input h-12 px-4 text-sm" />
+                  {(dateValidationError || dateServerError) && (
+                    <p className="text-xs text-destructive">{dateValidationError || dateServerError}</p>
+                  )}
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Voter Eligibility Rules</label>
@@ -639,7 +685,7 @@ const Elections = () => {
 
             <div className="flex gap-3 mt-8 pt-6 border-t border-border/20">
               <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
-              <button onClick={handleCreateSubmit} disabled={isSubmitting}
+              <button onClick={handleCreateSubmit} disabled={isSubmitting || !!dateValidationError}
                 className="admin-btn-primary px-6 py-2.5 text-sm font-medium transition-all duration-300 hover:scale-[1.01] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
                 {isSubmitting ? "Saving..." : (editingId ? "Update Election" : "Create Election")}
               </button>
@@ -650,9 +696,13 @@ const Elections = () => {
         {/* â”€â”€â”€â”€â”€ DETAIL VIEW â”€â”€â”€â”€â”€ */}
         {view === "detail" && selectedElection && (
           <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
+            {(() => {
+              const end = new Date(selectedElection.endDate);
+              const canPublishResults = !isNaN(end.getTime()) && new Date() > end;
+              return (
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <button onClick={() => setView("list")} className="text-muted-foreground hover:text-foreground transition-colors text-sm">â† Back</button>
+                <button onClick={() => setView("list")} className="text-muted-foreground hover:text-foreground transition-colors text-sm">&lt;- Back</button>
                 <h2 className="text-xl font-semibold text-foreground">{selectedElection.name}</h2>
                 <span className={`text-[10px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-full ${statusConfig[selectedElection.status].bg} ${statusConfig[selectedElection.status].color}`}>
                   {statusConfig[selectedElection.status].label}
@@ -666,15 +716,18 @@ const Elections = () => {
                 )}
                 <button
                   onClick={() => handleResultsPublish(selectedElection.id, !selectedElection.resultsPublished)}
+                  disabled={!selectedElection.resultsPublished && !canPublishResults}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all ${selectedElection.resultsPublished
                     ? "text-muted-foreground bg-muted/30 border-border/40 hover:bg-muted/40"
                     : "text-primary bg-primary/5 border-primary/20 hover:bg-primary/10"
-                    }`}
+                    } ${!selectedElection.resultsPublished && !canPublishResults ? "opacity-60 cursor-not-allowed hover:bg-primary/5" : ""}`}
                 >
                   {selectedElection.resultsPublished ? "Hide Results" : "Publish Results"}
                 </button>
               </div>
             </div>
+              );
+            })()}
 
             {/* Overview stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

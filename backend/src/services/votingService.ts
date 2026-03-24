@@ -1,6 +1,8 @@
 import { supabase } from '../config/supabase';
 import { ApiError } from '../middleware/errorHandler';
 import { verifyWebauthnAuthentication } from './authService';
+import { sendVoteConfirmationEmail } from '../utils/email';
+import { createNotification } from './notificationService';
 
 /**
  * Get all available elections dynamically filtered by voter's institution scope
@@ -90,8 +92,35 @@ export const getElections = async (userIdStr?: string) => {
     }
   }
 
+  const getEligibleVoterCount = async (election: any) => {
+    let usersQuery = supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'VOTER');
+
+    if (election.type === 'Faculty' || election.type === 'Departmental') {
+      if (election.scope_faculty && election.scope_faculty !== 'All' && election.scope_faculty !== 'University-Wide') {
+        usersQuery = usersQuery.eq('faculty', election.scope_faculty);
+      }
+      if (election.type === 'Departmental' && election.scope_department && election.scope_department !== 'All' && election.scope_department !== 'University-Wide') {
+        usersQuery = usersQuery.eq('department', election.scope_department);
+      }
+    }
+
+    if (election.scope_level && election.scope_level > 0) {
+      usersQuery = usersQuery.eq('level', election.scope_level);
+    }
+
+    const { count, error: countError } = await usersQuery;
+    if (countError) {
+      console.error('Eligible voter count error:', countError);
+      return 0;
+    }
+    return count || 0;
+  };
+
   // Format and map output for frontend — CRITICAL: map DB column names to frontend interface names
-  return elections.map((election: any) => {
+  return Promise.all(elections.map(async (election: any) => {
     const positionsMap = new Map();
     // Include all non-rejected candidates (approved + pending) so newly added candidates show
     const visibleCandidates = (candidatesByElection.get(election.id) || []).filter((c: any) => c.status !== 'rejected');
@@ -126,6 +155,8 @@ export const getElections = async (userIdStr?: string) => {
     });
 
     // CRITICAL FIX: explicitly remap DB column names → frontend interface field names
+    const eligibleVoters = await getEligibleVoterCount(election);
+
     return {
       id: election.id,
       title: election.title,
@@ -137,9 +168,11 @@ export const getElections = async (userIdStr?: string) => {
       require_biometrics: election.require_biometrics ?? election.biometric_enforced ?? false,
       required_level: election.scope_level ? String(election.scope_level) : null,
       type: election.type,
+      eligible_voters: eligibleVoters,
+      registeredVoters: eligibleVoters,
       positions: Array.from(positionsMap.values()),
     };
-  });
+  }));
 };
 
 /**
@@ -548,6 +581,36 @@ export const submitVote = async (
 
   // We could log every individual vote locally, but just 1 audit is fine
   await logAuditAction(userId, 'VOTE_SUBMITTED', 'ELECTION', input.electionId, 'SUCCESS');
+
+  // Notify voter (best-effort)
+  try {
+    await createNotification({
+      recipientRole: 'voter',
+      recipientId: userId,
+      title: 'Vote recorded',
+      description: `Your vote for "${election.title}" has been securely recorded.`,
+      type: 'success',
+      category: 'election',
+      route: '/dashboard'
+    });
+  } catch (notifyError) {
+    console.error('Vote notification failed:', notifyError);
+  }
+
+  // Best-effort vote confirmation email (do not block successful vote)
+  if (user.email) {
+    try {
+      await sendVoteConfirmationEmail(
+        user.email,
+        user.name || 'Voter',
+        election.title,
+        votePayloads.length,
+        new Date(),
+      );
+    } catch (emailError) {
+      console.error('Vote confirmation email failed:', emailError);
+    }
+  }
 
   return {
     success: true,

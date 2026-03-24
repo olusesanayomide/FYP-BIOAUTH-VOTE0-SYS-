@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Cookies from "js-cookie";
-import { getSystemSettings, getAuditLogs } from "@/services/adminService";
+import { getSystemSettings } from "@/services/adminService";
+import { getNotifications, markAllNotificationsRead, clearReadNotifications } from "@/services/notificationService";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const menuItems = [
@@ -83,33 +84,17 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
   const fetchNotifications = async () => {
     setNotifLoading(true);
     try {
-      const resp = await getAuditLogs();
+      const resp = await getNotifications(20);
       if (!resp.success || !resp.data) return;
 
-      const mapped: AdminNotification[] = (resp.data as any[]).slice(0, 8).map((log: any) => {
-        let details: any = {};
-        try {
-          details = log.details ? JSON.parse(log.details) : {};
-        } catch {
-          details = {};
-        }
-
-        const resource = String(log.resource_type || '').toUpperCase();
-        const route =
-          resource === 'ELECTION' ? "/h3xG9Lz_admin/dashboard/elections" :
-            resource === 'CANDIDATE' ? "/h3xG9Lz_admin/dashboard/candidates" :
-              resource === 'VOTER' || resource === 'USER' ? "/h3xG9Lz_admin/dashboard/voters" :
-                "/h3xG9Lz_admin/dashboard/audit";
-
-        return {
-          id: log.id || `${log.created_at}-${log.action}`,
-          title: String(log.action || 'System Update').replace(/_/g, ' '),
-          description: details?.description || `${log.resource_type || 'SYSTEM'} ${log.status || ''}`.trim(),
-          time: log.created_at ? new Date(log.created_at).toLocaleString() : "Unknown time",
-          route,
-          read: false
-        };
-      });
+      const mapped: AdminNotification[] = (resp.data as any[]).map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        description: n.description,
+        time: n.created_at ? new Date(n.created_at).toLocaleString() : "Unknown time",
+        route: n.route || "/h3xG9Lz_admin/dashboard",
+        read: !!n.isRead
+      }));
 
       setNotifications(mapped);
     } catch (error) {
@@ -273,6 +258,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
               <button
                 onClick={() => {
                   setIsNotifOpen((prev) => !prev);
+                  markAllNotificationsRead();
                   setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
                   setIsProfileOpen(false);
                 }}
@@ -301,6 +287,15 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
                         className="text-[10px] text-primary hover:underline"
                       >
                         Open Audit Trail
+                      </button>
+                      <button
+                        onClick={() => {
+                          clearReadNotifications();
+                          setNotifications((prev) => prev.filter((n) => !n.read));
+                        }}
+                        className="text-[10px] text-muted-foreground hover:underline"
+                      >
+                        Clear read
                       </button>
                     </div>
                     <div className="max-h-[340px] overflow-auto space-y-1">

@@ -6,6 +6,7 @@ import { getElections, Election } from "@/services/votingService"
 import { getCurrentUser } from "@/services/authService"
 import { format } from "date-fns"
 import { ElectionCard } from "./election-card"
+import { useVotedElections } from "@/hooks/useVotedElections"
 
 const statusConfig = {
   active: {
@@ -32,6 +33,7 @@ export function BallotsView() {
   const [elections, setElections] = useState<Election[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const { votedElectionIds } = useVotedElections();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -89,6 +91,7 @@ export function BallotsView() {
               key={ballot.id}
               election={ballot}
               isVerified={user?.registrationCompleted ?? user?.registration_completed}
+              initialHasVoted={votedElectionIds.has(ballot.id)}
             />
           ))}
         </div>

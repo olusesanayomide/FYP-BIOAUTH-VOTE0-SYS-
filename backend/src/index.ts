@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import votingRoutes from './routes/voting';
 import adminRoutes from './routes/admin';
+import notificationRoutes from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import { globalLimiter } from './middleware/rateLimiting';
 
@@ -138,6 +139,9 @@ app.use('/voting', votingRoutes);
 
 // Admin routes
 app.use('/admin', adminRoutes);
+
+// Notifications routes
+app.use('/notifications', notificationRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

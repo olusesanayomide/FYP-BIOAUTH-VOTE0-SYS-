@@ -213,6 +213,25 @@ CREATE INDEX idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 
 -- ============================================
+-- NOTIFICATIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  recipient_role VARCHAR(20) NOT NULL, -- 'admin' or 'voter'
+  recipient_id uuid NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  type VARCHAR(20) DEFAULT 'info',
+  category VARCHAR(50) DEFAULT 'system',
+  route TEXT,
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_notifications_recipient ON notifications(recipient_role, recipient_id);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at);
+
+-- ============================================
 -- ADMIN TABLE
 -- ============================================
 -- System administrators

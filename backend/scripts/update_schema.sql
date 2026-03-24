@@ -53,4 +53,21 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 ALTER TABLE public.users
 ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'VOTER';
 
+-- Notifications table (for admins and voters)
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    recipient_role VARCHAR(20) NOT NULL, -- 'admin' or 'voter'
+    recipient_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    type VARCHAR(20) DEFAULT 'info',
+    category VARCHAR(50) DEFAULT 'system',
+    route TEXT,
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON public.notifications(recipient_role, recipient_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at);
+
 -- Cleanup duplicate/old columns safely (Optional, omitted to avoid data loss)

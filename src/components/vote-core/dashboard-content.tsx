@@ -7,6 +7,7 @@ import { getElections, Election } from "@/services/votingService"
 import { getSystemSettings } from "@/services/adminService"
 import { getCurrentUser } from "@/services/authService"
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react"
+import { useVotedElections } from "@/hooks/useVotedElections"
 
 export function DashboardContent() {
   const [user, setUser] = useState<{
@@ -18,6 +19,7 @@ export function DashboardContent() {
   const [ongoingElections, setOngoingElections] = useState<Election[]>([]);
   const [upcomingElections, setUpcomingElections] = useState<Election[]>([]);
   const [completedElections, setCompletedElections] = useState<Election[]>([]);
+  const { votedElectionIds } = useVotedElections();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,7 +160,7 @@ export function DashboardContent() {
               </div>
               <div className="grid gap-6">
                 {ongoingElections.map(election => (
-                  <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} />
+                  <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
               </div>
             </section>
@@ -169,7 +171,7 @@ export function DashboardContent() {
               <h2 className="text-2xl font-bold tracking-tight">Upcoming Elections</h2>
               <div className="grid gap-6">
                 {upcomingElections.map(election => (
-                  <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} />
+                  <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
               </div>
             </section>
@@ -180,7 +182,7 @@ export function DashboardContent() {
               <h2 className="text-2xl font-bold tracking-tight text-muted-foreground">Completed Elections</h2>
               <div className="grid gap-6 opacity-80">
                 {completedElections.map(election => (
-                  <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} />
+                  <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
               </div>
             </section>

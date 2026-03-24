@@ -324,17 +324,34 @@ export function ResultsView() {
                 <h3 className="text-2xl md:text-3xl font-bold text-foreground">{result.electionTitle}</h3>
               </div>
 
-              <div className="flex flex-col items-start md:items-end">
-                <p className="text-sm text-muted-foreground mb-1 uppercase tracking-widest font-medium">Total Turnout</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl md:text-5xl font-black text-foreground">
-                    {result.totalVotes.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-muted-foreground font-medium">votes</span>
+              <div className="flex flex-col items-start md:items-end gap-4">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="h-16 w-16 rounded-full p-1"
+                    style={{
+                      background:
+                        turnoutInfo.pct !== null
+                          ? `conic-gradient(hsl(var(--primary)) ${turnoutInfo.pct}%, hsl(var(--muted)) ${turnoutInfo.pct}% 100%)`
+                          : "hsl(var(--muted))"
+                    }}
+                  >
+                    <div className="h-full w-full rounded-full bg-background flex items-center justify-center text-xs font-semibold text-foreground">
+                      {turnoutInfo.pct !== null ? `${turnoutInfo.pct}%` : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1 uppercase tracking-widest font-medium">Total Turnout</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl md:text-5xl font-black text-foreground">
+                        {result.totalVotes.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-muted-foreground font-medium">votes</span>
+                    </div>
+                    {turnoutInfo.pct !== null && (
+                      <span className="text-xs text-muted-foreground mt-1">Turnout: {turnoutInfo.pct}%</span>
+                    )}
+                  </div>
                 </div>
-                {turnoutInfo.pct !== null && (
-                  <span className="text-xs text-muted-foreground mt-1">Turnout: {turnoutInfo.pct}%</span>
-                )}
               </div>
             </div>
           </motion.div>
@@ -376,8 +393,15 @@ export function ResultsView() {
                     ) : (
                       sortedCandidates.map((c, index) => {
                         const pct = calculatePercentage(c.voteCount, totalPositionVotes);
-                        const barColor = 'bg-muted-foreground/30';
-                        const textColor = 'text-foreground/80';
+                        const barColors = [
+                          "bg-primary",
+                          "bg-emerald-500",
+                          "bg-blue-500",
+                          "bg-amber-500",
+                          "bg-rose-500"
+                        ];
+                        const barColor = barColors[index] || "bg-muted-foreground/40";
+                        const textColor = index === 0 && hasVotes ? "text-foreground" : "text-foreground/80";
 
                         return (
                           <div key={c.candidateId} className="relative group/cand">
@@ -385,6 +409,11 @@ export function ResultsView() {
                             <div className="flex items-end justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className={`text-sm font-semibold ${textColor} transition-colors`}>{c.candidateName}</span>
+                                {index === 0 && hasVotes && (
+                                  <span className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                    Winner
+                                  </span>
+                                )}
                               </div>
                               <div className="text-right">
                                 <span className="text-sm font-bold text-foreground">{c.voteCount.toLocaleString()}</span>

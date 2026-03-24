@@ -75,6 +75,7 @@ export function SettingsView() {
         { label: "Full Name", value: user?.name || "Loading..." },
         { label: "Email", value: user?.email || "Loading..." },
         { label: "Student ID", value: user?.matricNumber || "Loading..." },
+        { label: "Level", value: user ? (user.level ? String(user.level) : "Not set") : "Loading..." },
       ],
     },
     {

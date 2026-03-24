@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { getDashboardStats, createElection, getAllElections, getAllCandidates, createCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs } from '../services/adminService';
+import { getDashboardStats, createElection, getAllElections, getAllCandidates, createCandidate, updateCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs } from '../services/adminService';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -182,6 +182,21 @@ router.post('/candidates', async (req: Request, res: Response, next: NextFunctio
         const adminId = (req as any).user.id;
         const result = await createCandidate(req.body, adminId);
         res.status(201).json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * @route   PUT /admin/candidates/:id
+ * @desc    Update a candidate profile
+ * @access  Private (Admin only)
+ */
+router.put('/candidates/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const adminId = (req as any).user.id;
+        const result = await updateCandidate(req.params.id, req.body, adminId);
+        res.json(result);
     } catch (error) {
         next(error);
     }

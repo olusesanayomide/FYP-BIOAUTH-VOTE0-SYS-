@@ -9,9 +9,10 @@ export interface ElectionCardProps {
   election: Election;
   isVerified?: boolean;
   institutionName?: string;
+  initialHasVoted?: boolean;
 }
 
-export function ElectionCard({ election, isVerified = false, institutionName = "University Voting Portal" }: ElectionCardProps) {
+export function ElectionCard({ election, isVerified = false, institutionName = "University Voting Portal", initialHasVoted = false }: ElectionCardProps) {
   const [isOngoing, setIsOngoing] = useState(false);
   const [isUpcoming, setIsUpcoming] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -87,8 +88,12 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [hasVoted, setHasVoted] = useState(false);
+  const [hasVoted, setHasVoted] = useState(initialHasVoted);
   const [eligibilityMessage, setEligibilityMessage] = useState("");
+
+  useEffect(() => {
+    setHasVoted(initialHasVoted);
+  }, [initialHasVoted, election.id]);
 
   const formatDateRange = () => {
     try {
@@ -175,6 +180,14 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
       if (result.success) {
         setSubmitSuccess(true);
         setHasVoted(true);
+        try {
+          const raw = localStorage.getItem('voter_voted_elections');
+          const existing: string[] = raw ? JSON.parse(raw) : [];
+          if (!existing.includes(election.id)) {
+            existing.push(election.id);
+            localStorage.setItem('voter_voted_elections', JSON.stringify(existing));
+          }
+        } catch { }
       } else {
         setSubmitError(result.error || "Failed to submit vote. You may have already voted.");
       }

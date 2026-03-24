@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { ApiError } from '../middleware/errorHandler';
+import { createBroadcastForRole, createNotification } from './notificationService';
 import bcrypt from 'bcryptjs';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
@@ -125,6 +126,14 @@ export const createElection = async (electionData: any, adminId: string) => {
         if (!name || !startDate || !endDate) {
             throw new ApiError(400, 'Name, start date, and end date are required', 'VALIDATION_ERROR');
         }
+        const startTime = new Date(startDate);
+        const endTime = new Date(endDate);
+        if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+            throw new ApiError(400, 'Start and end dates must be valid', 'INVALID_ELECTION_TIME');
+        }
+        if (endTime <= startTime) {
+            throw new ApiError(400, 'End time must be after start time', 'INVALID_ELECTION_TIME');
+        }
 
         const basePayload: any = {
             title: name,
@@ -181,6 +190,29 @@ export const createElection = async (electionData: any, adminId: string) => {
                 description: `Created new election: ${data.title}`
             })
         });
+
+        // Best-effort notifications
+        try {
+            await createNotification({
+                recipientRole: 'admin',
+                recipientId: adminId,
+                title: 'Election created',
+                description: `Created election "${data.title}".`,
+                type: 'success',
+                category: 'election',
+                route: '/h3xG9Lz_admin/dashboard/elections'
+            });
+
+            await createBroadcastForRole('voter', {
+                title: 'New election scheduled',
+                description: `"${data.title}" has been scheduled. Check dates and eligibility.`,
+                type: 'info',
+                category: 'election',
+                route: '/dashboard'
+            });
+        } catch (notifyError) {
+            console.error('Notification dispatch failed:', notifyError);
+        }
 
         return {
             success: true,
@@ -620,6 +652,109 @@ export const createCandidate = async (candidateData: any, adminId: string) => {
 };
 
 /**
+ * Updates a candidate's profile information
+ */
+export const updateCandidate = async (id: string, candidateData: any, adminId: string) => {
+    try {
+        const {
+            name, position, studentId, email, bio, electionId, status, party, photoUrl, manifestoUrl,
+            faculty: manualFaculty, department: manualDepartment, level: manualLevel
+        } = candidateData;
+
+        if (!name || !position || !studentId || !electionId) {
+            throw new ApiError(400, 'Missing required fields for candidate update', 'VALIDATION_ERROR');
+        }
+
+        const { data: existingCandidate, error: existingError } = await supabase
+            .from('candidates')
+            .select('party')
+            .eq('id', id)
+            .single();
+
+        if (existingError) {
+            throw existingError;
+        }
+
+        const resolvedParty = party || (existingCandidate as any)?.party || 'Independent';
+
+        const { data: electionData } = await supabase
+            .from('elections')
+            .select('title')
+            .eq('id', electionId)
+            .single();
+
+        const electionName = electionData ? electionData.title : 'Unknown Election';
+
+        const { data: studentInfo } = await supabase
+            .from('users')
+            .select('faculty, department, level')
+            .eq('matric_no', studentId)
+            .single();
+
+        const faculty = studentInfo?.faculty || manualFaculty || 'Unknown';
+        const department = studentInfo?.department || manualDepartment || 'Unknown';
+        const level = studentInfo?.level || manualLevel || 'Unknown';
+
+        const { data, error } = await supabase
+            .from('candidates')
+            .update({
+                name,
+                position,
+                student_id: studentId,
+                email,
+                bio,
+                faculty,
+                department,
+                level,
+                election_id: electionId,
+                status: status || 'pending',
+                party: resolvedParty,
+                photo_url: photoUrl,
+                manifesto_url: manifestoUrl
+            })
+            .eq('id', id)
+            .select(`
+                *,
+                elections:election_id (
+                    title
+                )
+            `)
+            .single();
+
+        if (error) throw error;
+
+        await supabase.from('audit_logs').insert({
+            action: 'CANDIDATE_UPDATED',
+            resource_type: 'CANDIDATE',
+            resource_id: data.id,
+            admin_id: adminId,
+            status: 'SUCCESS',
+            details: JSON.stringify({
+                name: data.name,
+                position: data.position,
+                election_name: electionName,
+                description: `Updated candidate ${data.name} in election ${electionName}`
+            })
+        });
+
+        const responseData = {
+            ...data,
+            election_name: data?.elections?.title || electionName
+        };
+
+        return {
+            success: true,
+            message: 'Candidate updated successfully',
+            data: responseData
+        };
+    } catch (error: any) {
+        console.error('Error updating candidate:', error);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, 'Failed to update candidate', 'DATABASE_ERROR');
+    }
+};
+
+/**
  * Updates a candidate's status
  */
 export const updateCandidateStatus = async (id: string, status: string, adminId: string) => {
@@ -709,8 +844,31 @@ export const deleteCandidate = async (id: string, adminId: string) => {
  */
 export const deleteElection = async (id: string, adminId: string) => {
     try {
-        // 0. Fetch election title for audit
-        const { data: election } = await supabase.from('elections').select('title').eq('id', id).single();
+        // 0. Fetch election details for audit and validation
+        const { data: election, error: electionFetchError } = await supabase
+            .from('elections')
+            .select('title, start_time, end_time, status')
+            .eq('id', id)
+            .single();
+
+        if (electionFetchError || !election) {
+            throw new ApiError(404, 'Election not found', 'NOT_FOUND');
+        }
+
+        const startTime = election.start_time ? new Date(election.start_time) : null;
+        const endTime = election.end_time ? new Date(election.end_time) : null;
+        const now = new Date();
+        const isOngoing =
+            startTime &&
+            endTime &&
+            !isNaN(startTime.getTime()) &&
+            !isNaN(endTime.getTime()) &&
+            now >= startTime &&
+            now <= endTime;
+
+        if (isOngoing) {
+            throw new ApiError(403, 'Cannot delete an ongoing election', 'ELECTION_ONGOING');
+        }
 
         console.log(`[AdminService] Initiating permanent deletion for election: ${id}`);
 
@@ -743,14 +901,14 @@ export const deleteElection = async (id: string, adminId: string) => {
         }
 
         // 5. Finally delete the election itself
-        const { error: electionError } = await supabase
+        const { error: electionDeleteError } = await supabase
             .from('elections')
             .delete()
             .eq('id', id);
 
-        if (electionError) {
-            console.error('Error deleting main election record:', electionError);
-            throw new ApiError(500, `Failed to delete main election record: ${electionError.message}`, 'DATABASE_ERROR');
+        if (electionDeleteError) {
+            console.error('Error deleting main election record:', electionDeleteError);
+            throw new ApiError(500, `Failed to delete main election record: ${electionDeleteError.message}`, 'DATABASE_ERROR');
         }
 
         console.log(`[AdminService] Election ${id} and all associated data deleted successfully`);
@@ -792,6 +950,14 @@ export const updateElection = async (id: string, electionData: any, adminId: str
 
         if (!name || !startDate || !endDate) {
             throw new ApiError(400, 'Name, start date, and end date are required', 'VALIDATION_ERROR');
+        }
+        const startTime = new Date(startDate);
+        const endTime = new Date(endDate);
+        if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+            throw new ApiError(400, 'Start and end dates must be valid', 'INVALID_ELECTION_TIME');
+        }
+        if (endTime <= startTime) {
+            throw new ApiError(400, 'End time must be after start time', 'INVALID_ELECTION_TIME');
         }
 
         const updatePayload: any = {
@@ -889,6 +1055,30 @@ export const updateElectionStatus = async (id: string, status: string, adminId: 
             })
         });
 
+        try {
+            await createNotification({
+                recipientRole: 'admin',
+                recipientId: adminId,
+                title: 'Election status updated',
+                description: `Election "${(data as any).title}" set to ${status}.`,
+                type: 'info',
+                category: 'election',
+                route: '/h3xG9Lz_admin/dashboard/elections'
+            });
+
+            if (status === 'suspended' || status === 'active') {
+                await createBroadcastForRole('voter', {
+                    title: status === 'suspended' ? 'Election suspended' : 'Election resumed',
+                    description: `"${(data as any).title}" is now ${status === 'suspended' ? 'paused' : 'active'}.`,
+                    type: status === 'suspended' ? 'warning' : 'info',
+                    category: 'election',
+                    route: '/dashboard'
+                });
+            }
+        } catch (notifyError) {
+            console.error('Notification dispatch failed:', notifyError);
+        }
+
         return {
             success: true,
             message: `Election status updated to ${status}`,
@@ -905,6 +1095,26 @@ export const updateElectionStatus = async (id: string, status: string, adminId: 
  */
 export const updateElectionResultsVisibility = async (id: string, publish: boolean, adminId: string) => {
     try {
+        const { data: election, error: electionError } = await supabase
+            .from('elections')
+            .select('id, title, end_time')
+            .eq('id', id)
+            .single();
+
+        if (electionError || !election) {
+            throw new ApiError(404, 'Election not found', 'NOT_FOUND');
+        }
+
+        if (publish) {
+            const endTime = election.end_time ? new Date(election.end_time) : null;
+            if (!endTime || isNaN(endTime.getTime())) {
+                throw new ApiError(400, 'Election end time is invalid', 'INVALID_ELECTION_TIME');
+            }
+            if (new Date() < endTime) {
+                throw new ApiError(403, 'Cannot publish results before the election ends', 'ELECTION_NOT_ENDED');
+            }
+        }
+
         const { data, error } = await supabase
             .from('elections')
             .update({ results_published: publish })
@@ -926,6 +1136,30 @@ export const updateElectionResultsVisibility = async (id: string, publish: boole
                 description: publish ? `Published results for election ${data.title}` : `Hid results for election ${data.title}`
             })
         });
+
+        try {
+            await createNotification({
+                recipientRole: 'admin',
+                recipientId: adminId,
+                title: publish ? 'Results published' : 'Results hidden',
+                description: `${publish ? 'Published' : 'Hid'} results for "${data.title}".`,
+                type: publish ? 'success' : 'warning',
+                category: 'results',
+                route: '/h3xG9Lz_admin/dashboard/elections'
+            });
+
+            if (publish) {
+                await createBroadcastForRole('voter', {
+                    title: 'Election results published',
+                    description: `Results for "${data.title}" are now available.`,
+                    type: 'success',
+                    category: 'results',
+                    route: '/dashboard'
+                });
+            }
+        } catch (notifyError) {
+            console.error('Notification dispatch failed:', notifyError);
+        }
 
         return {
             success: true,

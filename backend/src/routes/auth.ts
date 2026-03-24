@@ -503,7 +503,7 @@ router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respons
     } else {
       const { data: voter, error } = await supabase
         .from('users')
-        .select('id, email, matric_no, name, role, biometric_status, registration_completed')
+        .select('id, email, matric_no, name, role, biometric_status, registration_completed, level')
         .eq('id', req.user.id)
         .single();
 
@@ -534,6 +534,7 @@ router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respons
         role: voter.role,
         biometricStatus: voter.biometric_status,
         registrationCompleted: voter.registration_completed,
+        level: voter.level,
         last_login_at: lastLoginAt,
         last_login_ip: lastLoginIp,
         last_login_user_agent: lastLoginUserAgent
