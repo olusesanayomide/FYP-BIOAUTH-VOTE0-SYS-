@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppProviders } from "@/components/app-providers";
 
 export const metadata: Metadata = {
     title: "(Admin) Online Biometric Voting System",
@@ -10,5 +11,5 @@ export default function RootLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
-    return children;
+    return <AppProviders>{children}</AppProviders>;
 }

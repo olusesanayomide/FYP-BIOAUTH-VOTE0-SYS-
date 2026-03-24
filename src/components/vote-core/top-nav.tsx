@@ -15,7 +15,7 @@ interface TopNavNotification {
   id: string
   title: string
   description: string
-  type: "info" | "success" | "warning"
+  type: "info" | "success" | "warning" | "error"
   time: string
   isRead: boolean
   category: "election" | "results" | "system" | "verification"

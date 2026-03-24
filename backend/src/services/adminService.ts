@@ -1760,7 +1760,7 @@ const generatePDFReport = async (data: any): Promise<{ buffer: Buffer, contentTy
         const doc = new PDFDocument({ margin: 50 });
         const chunks: any[] = [];
 
-        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
         doc.on('end', () => {
             const result = Buffer.concat(chunks);
             resolve({

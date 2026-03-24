@@ -1,19 +1,13 @@
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
-import HowItWorks from "@/components/HowItWorks";
-import SecuritySection from "@/components/SecuritySection";
-import CTASection from "@/components/CTASection";
-import Footer from "@/components/Footer";
+import { LandingClient } from "@/components/LandingClient";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <HeroSection />
-      <HowItWorks />
-      <SecuritySection />
-      <CTASection />
-      <Footer />
+      <LandingClient />
     </div>
   );
 }

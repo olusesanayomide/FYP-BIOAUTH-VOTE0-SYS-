@@ -22,7 +22,7 @@ type BiometricState = "idle" | "verifying-token" | "permission" | "scanning" | "
 const AdminBiometricRegistration = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const token = searchParams?.get("token") || "";
 
   const [biometricState, setBiometricState] = useState<BiometricState>("verifying-token");
   const [biometricProgress, setBiometricProgress] = useState(0);

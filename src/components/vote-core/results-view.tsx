@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { getElections, getVotingResults, Election } from "@/services/votingService"
+import { getElections, getVotingResults, Election, VoteResult } from "@/services/votingService"
 import { Loader2, BarChart3, Trophy, AlertCircle, TrendingUp, CheckCircle, RefreshCcw } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -17,12 +17,6 @@ interface PositionResult {
   candidates: CandidateResult[];
 }
 
-interface ElectionResult {
-  electionTitle: string;
-  totalVotes: number;
-  results: PositionResult[];
-}
-
 type ElectionPhase = "upcoming" | "ongoing" | "ended" | "suspended" | "unknown";
 
 export function ResultsView() {
@@ -30,7 +24,7 @@ export function ResultsView() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [resultLoading, setResultLoading] = useState(false);
-  const [result, setResult] = useState<ElectionResult | null>(null);
+  const [result, setResult] = useState<VoteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedElection = useMemo(
@@ -115,7 +109,7 @@ export function ResultsView() {
     setTimeout(async () => {
       const resp = await getVotingResults(electionId);
       if (resp.success && resp.data) {
-        setResult(resp.data as ElectionResult);
+        setResult(resp.data);
       } else {
         setError(resp.error || "Results are not available yet.");
       }

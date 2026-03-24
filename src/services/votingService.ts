@@ -81,16 +81,16 @@ export interface VoteSubmission {
  * Vote result
  */
 export interface VoteResult {
-  electionId: string;
-  positions: Array<{
+  electionTitle: string;
+  totalVotes: number;
+  results: Array<{
     positionId: string;
-    positionTitle: string;
+    positionName: string;
     candidates: Array<{
       candidateId: string;
-      name: string;
+      candidateName: string;
       voteCount: number;
     }>;
-    totalVotes: number;
   }>;
 }
 
