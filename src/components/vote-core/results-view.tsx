@@ -57,9 +57,8 @@ export function ResultsView() {
   const turnoutInfo = useMemo(() => {
     const totalVotes = result?.totalVotes ?? 0;
     const eligible =
-      (selectedElection as any)?.eligible_voters ??
-      (selectedElection as any)?.eligibleVoters ??
-      (selectedElection as any)?.registeredVoters ??
+      selectedElection?.eligible_voters ??
+      selectedElection?.registeredVoters ??
       null;
     const pct = eligible ? Math.min(100, Math.round((totalVotes / eligible) * 100)) : null;
     return { totalVotes, eligible, pct };
