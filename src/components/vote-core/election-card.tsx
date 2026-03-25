@@ -256,6 +256,12 @@ export function ElectionCard({ election, isVerified = false, institutionName = "
                   Completed
                 </span>
               )}
+              {hasVoted && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Voted
+                </span>
+              )}
             </div>
 
             <p className="text-[15px] leading-relaxed text-foreground/75 dark:text-slate-300 max-w-[90%]">

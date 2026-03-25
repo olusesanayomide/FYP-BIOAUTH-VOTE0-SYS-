@@ -6,7 +6,7 @@ import { getWebAuthnRegistrationOptions, verifyWebAuthnRegistration, getCurrentU
 
 type BiometricState = "idle" | "scanning" | "success" | "error";
 
-export function VerificationStatus() {
+export function VerificationStatus({ compact = false }: { compact?: boolean }) {
   const [isVerified, setIsVerified] = useState(false);
   const [biometricState, setBiometricState] = useState<BiometricState>("idle");
   const [biometricError, setBiometricError] = useState("");
@@ -78,10 +78,11 @@ export function VerificationStatus() {
   };
 
   return (
-    <div className="animate-fade-in-up flex flex-col items-center justify-center py-12">
-      <div className="glass flex max-w-md flex-col items-center rounded-2xl px-10 py-14 text-center">
+    <div className={`animate-fade-in-up flex flex-col items-center justify-center ${compact ? "py-4" : "py-12"}`}>
+      <div className={`glass flex w-full flex-col items-center rounded-2xl text-center ${compact ? "max-w-none px-6 py-6" : "max-w-md px-10 py-14"}`}>
         {/* Fingerprint hologram with scan ring */}
-        <div className="relative mb-8 flex h-36 w-36 items-center justify-center">
+        {!compact && (
+          <div className="relative mb-8 flex h-36 w-36 items-center justify-center">
           {/* Outer rotating scan ring */}
           <div
             className={`scan-ring absolute inset-0 rounded-full border-2 border-transparent ${isVerified
@@ -117,6 +118,7 @@ export function VerificationStatus() {
             <path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2" />
           </svg>
         </div>
+        )}
 
         {/* Status icon */}
         <div
@@ -128,10 +130,10 @@ export function VerificationStatus() {
           <ShieldCheck className="h-6 w-6" />
         </div>
 
-        <h2 className="mb-2 text-xl font-bold text-foreground">
+        <h2 className={`mb-2 font-bold text-foreground ${compact ? "text-base" : "text-xl"}`}>
           {isVerified ? "Biometric Identity: Verified" : "Biometric Identity: Pending"}
         </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className={`leading-relaxed text-muted-foreground ${compact ? "text-xs" : "text-sm"}`}>
           {biometricState === "error"
             ? <span className="text-destructive font-medium">{biometricError}</span>
             : isVerified
@@ -143,7 +145,7 @@ export function VerificationStatus() {
           <button
             onClick={handleStartVerification}
             disabled={biometricState === "scanning"}
-            className="mt-6 rounded-xl flex items-center gap-2 justify-center bg-gradient-to-r from-primary to-primary/80 px-8 py-3 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(139,92,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`mt-4 rounded-xl flex items-center gap-2 justify-center bg-gradient-to-r from-primary to-primary/80 px-6 py-2.5 text-xs font-semibold text-primary-foreground transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(139,92,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed ${compact ? "w-full" : ""}`}
           >
             {biometricState === "scanning" ? (
               <>

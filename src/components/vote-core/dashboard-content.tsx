@@ -1,13 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { StatusCards } from "./status-cards"
 import { ElectionCard, NoElectionState } from "./election-card"
-import { getElections, Election } from "@/services/votingService"
+import { getElections, getUserVotingHistory, Election, VotingHistoryEntry } from "@/services/votingService"
 import { getSystemSettings } from "@/services/adminService"
 import { getCurrentUser } from "@/services/authService"
 import { Loader2, AlertCircle, RefreshCw, ChevronRight } from "lucide-react"
 import { useVotedElections } from "@/hooks/useVotedElections"
+import Link from "next/link"
 
 export function DashboardContent() {
   const [user, setUser] = useState<{
@@ -19,6 +20,8 @@ export function DashboardContent() {
   const [ongoingElections, setOngoingElections] = useState<Election[]>([]);
   const [upcomingElections, setUpcomingElections] = useState<Election[]>([]);
   const [completedElections, setCompletedElections] = useState<Election[]>([]);
+  const [allElections, setAllElections] = useState<Election[]>([]);
+  const [historyItems, setHistoryItems] = useState<VotingHistoryEntry[]>([]);
   const { votedElectionIds } = useVotedElections();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +38,10 @@ export function DashboardContent() {
         localStorage.setItem('user', JSON.stringify(userResp.data));
       }
 
-      const resp = await getElections();
+      const [resp, historyResp] = await Promise.all([
+        getElections(),
+        getUserVotingHistory(),
+      ]);
 
       try {
         const sysResp = await getSystemSettings();
@@ -50,6 +56,7 @@ export function DashboardContent() {
       if (resp.success && resp.data) {
         const now = new Date();
         const allElections = resp.data;
+        setAllElections(allElections);
         console.log(`[DashboardContent] Received ${allElections.length} elections`);
 
         // Show all elections including suspended ones as part of "every instance" requirement
@@ -83,6 +90,10 @@ export function DashboardContent() {
         console.error('[DashboardContent] Error from API:', resp.error);
         setError(resp.error || 'Failed to load elections. Please try again.');
       }
+
+      if (historyResp.success && historyResp.data) {
+        setHistoryItems(historyResp.data);
+      }
     } catch (err: any) {
       console.error('[DashboardContent] Exception:', err);
       setError('A network error occurred. Is the backend server running?');
@@ -100,6 +111,17 @@ export function DashboardContent() {
     }
     loadData();
   }, [])
+
+  const hasElections = ongoingElections.length > 0 || upcomingElections.length > 0 || completedElections.length > 0;
+  const recentActivityElections = useMemo(() => {
+    const byId = new Map(allElections.map((e) => [e.id, e]));
+    return historyItems
+      .slice()
+      .sort((a, b) => new Date(b.votedAt).getTime() - new Date(a.votedAt).getTime())
+      .map((item) => byId.get(item.electionId))
+      .filter((e): e is Election => Boolean(e))
+      .slice(0, 2);
+  }, [allElections, historyItems]);
 
   if (loading) {
     return (
@@ -125,8 +147,6 @@ export function DashboardContent() {
     )
   }
 
-  const hasElections = ongoingElections.length > 0 || upcomingElections.length > 0 || completedElections.length > 0;
-
   return (
     <div className="space-y-10">
       {/* Welcome Section */}
@@ -147,6 +167,33 @@ export function DashboardContent() {
         registrationCompleted={user?.biometricStatus === 'VERIFIED'}
       />
 
+      {/* Recent Activity */}
+      {recentActivityElections.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Recent Activity</h2>
+          <div className="grid gap-4">
+            {recentActivityElections.map((election) => (
+              <ElectionCard
+                key={election.id}
+                election={election}
+                isVerified={user?.biometricStatus === 'VERIFIED'}
+                institutionName={universityName}
+                initialHasVoted={votedElectionIds.has(election.id)}
+                compact
+              />
+            ))}
+          </div>
+          <div className="pt-4">
+            <Link
+              href="/voting-history"
+              className="inline-flex h-11 items-center justify-center gap-1 text-sm font-semibold text-primary hover:text-primary/80 transition-colors w-full"
+            >
+              View all history <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* Elections Sections */}
       {!hasElections ? (
         <NoElectionState />
@@ -162,17 +209,6 @@ export function DashboardContent() {
                 {ongoingElections.slice(0, 2).map(election => (
                   <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
-                {ongoingElections.length > 2 && (
-                  <button
-                    onClick={() => {
-                      localStorage.setItem("voter_active_view", "ballots");
-                      window.dispatchEvent(new CustomEvent("voter:set-active-view", { detail: "ballots" }));
-                    }}
-                    className="mt-4 inline-flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
-                  >
-                    View all ballots <ChevronRight className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             </section>
           )}
@@ -184,17 +220,6 @@ export function DashboardContent() {
                 {upcomingElections.slice(0, 2).map(election => (
                   <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
-                {upcomingElections.length > 2 && (
-                  <button
-                    onClick={() => {
-                      localStorage.setItem("voter_active_view", "ballots");
-                      window.dispatchEvent(new CustomEvent("voter:set-active-view", { detail: "ballots" }));
-                    }}
-                    className="mt-4 inline-flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
-                  >
-                    View all ballots <ChevronRight className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             </section>
           )}
@@ -206,17 +231,6 @@ export function DashboardContent() {
                 {completedElections.slice(0, 2).map(election => (
                   <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
-                {completedElections.length > 2 && (
-                  <button
-                    onClick={() => {
-                      localStorage.setItem("voter_active_view", "ballots");
-                      window.dispatchEvent(new CustomEvent("voter:set-active-view", { detail: "ballots" }));
-                    }}
-                    className="mt-4 inline-flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
-                  >
-                    View all ballots <ChevronRight className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             </section>
           )}

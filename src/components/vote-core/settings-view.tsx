@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Bell, Shield, User, Globe, Loader2 } from "lucide-react"
 import { getCurrentUser } from "@/services/authService"
+import { VerificationStatus } from "@/components/vote-core/verification-status"
 
 export function SettingsView() {
   const [user, setUser] = useState<any>(null);
@@ -107,6 +108,13 @@ export function SettingsView() {
   return (
     <div className="animate-fade-in-up">
       <h2 className="mb-6 text-lg font-semibold text-foreground">Settings</h2>
+
+      <div className="mb-6">
+        <h3 className="mb-3 text-sm font-semibold text-foreground">Verification Status</h3>
+        <div className="glass rounded-xl p-4">
+          <VerificationStatus compact />
+        </div>
+      </div>
 
       <div className="stagger-children space-y-5">
         {settingsGroups.map((group) => (

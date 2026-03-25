@@ -5,8 +5,6 @@ import { ParticleBackground } from "@/components/vote-core/particle-background"
 import { TopNav } from "@/components/vote-core/top-nav"
 import { Sidebar } from "@/components/vote-core/sidebar"
 import { DashboardContent } from "@/components/vote-core/dashboard-content"
-import { BallotsView } from "@/components/vote-core/ballots-view"
-import { VerificationStatus } from "@/components/vote-core/verification-status"
 import { VotingHistory } from "@/components/vote-core/voting-history"
 import { ResultsView } from "@/components/vote-core/results-view"
 import { SettingsView } from "@/components/vote-core/settings-view"
@@ -22,15 +20,19 @@ export default function VoterDashboard() {
     if (!isAuthorized) return
 
     const savedView = localStorage.getItem("voter_active_view")
-    if (savedView && ["dashboard", "ballots", "verification", "results", "history", "settings"].includes(savedView)) {
+    if (savedView && ["dashboard", "results", "history", "settings"].includes(savedView)) {
       setActiveView(savedView)
+    } else if (savedView === "ballots") {
+      setActiveView("history")
       localStorage.removeItem("voter_active_view")
     }
 
     const onSetActiveView = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail
-      if (detail && ["dashboard", "ballots", "verification", "results", "history", "settings"].includes(detail)) {
+      if (detail && ["dashboard", "results", "history", "settings"].includes(detail)) {
         setActiveView(detail)
+      } else if (detail === "ballots") {
+        setActiveView("history")
       }
     }
 
@@ -52,10 +54,6 @@ export default function VoterDashboard() {
     switch (activeView) {
       case "dashboard":
         return <DashboardContent />
-      case "ballots":
-        return <BallotsView />
-      case "verification":
-        return <VerificationStatus />
       case "results":
         return <ResultsView />
       case "history":
