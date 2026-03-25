@@ -25,6 +25,7 @@ if (process.env.NODE_ENV === 'development' && process.env.ALLOW_INSECURE_TLS ===
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Trust the first proxy in front of Express (like ngrok or Vercel)
 app.set('trust proxy', 1);
@@ -44,10 +45,13 @@ const envOrigins = [process.env.CORS_ORIGIN, process.env.FRONTEND_URL]
   .filter(Boolean);
 
 const allowedOrigins = [
-  'http://localhost:3000',
+  ...(isProduction ? [] : ['http://localhost:3000']),
   ...envOrigins,
 ] as string[];
 
+if (isProduction && allowedOrigins.length === 0) {
+  console.warn('[CORS] No allowed origins configured. Set CORS_ORIGIN or FRONTEND_URL.');
+}
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -163,16 +167,12 @@ app.use(errorHandler);
 // ============================================
 
 app.listen(PORT, () => {
-  console.log(`
-╔══════════════════════════════════════════════════════════╗
-║     Biometric Voting System Backend Server Started       ║
-╠══════════════════════════════════════════════════════════╣
-║ Server is running on http://localhost:${PORT}                  ║
-║ Environment: ${process.env.NODE_ENV || 'development'}                  ║
-║ API Documentation: http://localhost:${PORT}/api             ║
-║ Health Check: http://localhost:${PORT}/health               ║
-╚══════════════════════════════════════════════════════════╝
-  `);
+  const envLabel = process.env.NODE_ENV || 'development';
+  console.log('Backend server started');
+  console.log(`Environment: ${envLabel}`);
+  console.log(`Listening on port ${PORT}`);
+  console.log('Health: /health');
+  console.log('Docs: /api');
 });
 
 // Graceful shutdown
