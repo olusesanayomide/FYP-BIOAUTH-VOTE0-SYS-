@@ -52,15 +52,13 @@ export function ResultsView() {
     return "unknown";
   }, [selectedElection]);
 
-  const resultsPublished = Boolean((selectedElection as any)?.results_published);
+  const resultsPublished = Boolean(selectedElection?.results_published);
 
   const turnoutInfo = useMemo(() => {
     const totalVotes = result?.totalVotes ?? 0;
     const eligible =
-      (selectedElection as any)?.eligible_voters ??
-      (selectedElection as any)?.eligibleVoters ??
-      (selectedElection as any)?.totalEligibleVoters ??
-      (selectedElection as any)?.registeredVoters ??
+      selectedElection?.eligible_voters ??
+      selectedElection?.registeredVoters ??
       null;
     const pct = eligible ? Math.min(100, Math.round((totalVotes / eligible) * 100)) : null;
     return { totalVotes, eligible, pct };
@@ -95,9 +93,9 @@ export function ResultsView() {
 
   const loadResults = async (electionId: string) => {
     if (!electionId) return;
-    if (phase !== "ended" && !resultsPublished) {
+    if (!resultsPublished) {
       setResult(null);
-      setError(null);
+      setError("Results for this election have not been officially published yet.");
       setResultLoading(false);
       return;
     }

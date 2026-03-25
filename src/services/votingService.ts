@@ -49,6 +49,7 @@ export interface Election {
   status: 'upcoming' | 'active' | 'completed' | 'suspended';
   required_level?: string;
   require_biometrics?: boolean;
+  results_published?: boolean;
   positions: Position[];
 }
 
