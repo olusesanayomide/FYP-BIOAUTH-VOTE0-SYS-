@@ -1673,8 +1673,21 @@ export const exportElectionResults = async (electionId: string, format: string) 
 
         if (electionError || !election) throw new ApiError(404, 'Election not found');
 
-        const { data: settings } = await supabase.from('system_settings').select('*').single();
-        const institutionName = settings?.university_name || 'Institution Name';
+        let institutionName = 'Institution Name';
+        const { data: settingsRows, error: settingsError } = await supabase
+            .from('app_settings')
+            .select('key, value, description');
+
+        if (!settingsError && settingsRows) {
+            const settingsMap = (settingsRows || []).reduce((acc: any, row: any) => {
+                acc[row.key] = row.value;
+                return acc;
+            }, {});
+
+            institutionName = settingsMap['UNIVERSITY_NAME'] || settingsMap['SYSTEM_NAME'] || institutionName;
+        } else if (settingsError && settingsError.code !== '42P01') {
+            console.error('Failed to load app settings for report:', settingsError);
+        }
 
         // 1.2 Fetch Candidates & their vote counts
         const { data: candidates, error: candidatesError } = await supabase
