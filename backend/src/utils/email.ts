@@ -112,6 +112,10 @@ const initializeSmtpTransporter = () => {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
     } : undefined,
+    // Avoid long hangs in production SMTP
+    connectionTimeout: parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || '10000'),
+    greetingTimeout: parseInt(process.env.SMTP_GREETING_TIMEOUT_MS || '10000'),
+    socketTimeout: parseInt(process.env.SMTP_SOCKET_TIMEOUT_MS || '15000'),
   });
 
   return transporter;
@@ -122,6 +126,7 @@ export const sendOtpEmail = async (email: string, otp: string, name: string) => 
   const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
   const recipient = forcedRecipient || email;
   const textBody = `Hello ${name}, your one-time verification code is ${otp}. This code expires in 15 minutes.`;
+  const start = Date.now();
 
   // If RESEND_API_KEY is set, prefer Resend API
   const resendKey = process.env.RESEND_API_KEY;
@@ -160,7 +165,9 @@ export const sendOtpEmail = async (email: string, otp: string, name: string) => 
   // Fallback to SMTP
   try {
     const transporter = initializeSmtpTransporter();
-    await transporter.verify();
+    if (process.env.NODE_ENV !== 'production') {
+      await transporter.verify();
+    }
 
     const info = await transporter.sendMail({
       from,
@@ -175,7 +182,7 @@ export const sendOtpEmail = async (email: string, otp: string, name: string) => 
       throw new Error(`SMTP rejected recipient(s): ${info.rejected.join(', ')}`);
     }
 
-    console.log(`[EMAIL] OTP email accepted by SMTP server for recipient: ${recipient}`);
+    console.log(`[EMAIL] OTP email accepted by SMTP server for recipient: ${recipient} in ${Date.now() - start}ms`);
     return { success: true };
 } catch (error) {
     console.error('Failed to send OTP email via SMTP:', error);
@@ -188,6 +195,7 @@ export const sendAdminSetupEmail = async (email: string, name: string, setupLink
   const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
   const recipient = forcedRecipient || email;
   const textBody = `Hello ${name},\n\nYou have been invited to set up your Administrator account for the Secure Voting System. Please click the following link to register your biometric credentials:\n\n${setupLink}\n\nThis link expires in 24 hours.`;
+  const start = Date.now();
 
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
@@ -221,7 +229,9 @@ export const sendAdminSetupEmail = async (email: string, name: string, setupLink
   // Fallback to SMTP
   try {
     const transporter = initializeSmtpTransporter();
-    await transporter.verify();
+    if (process.env.NODE_ENV !== 'production') {
+      await transporter.verify();
+    }
 
     const info = await transporter.sendMail({
       from,
@@ -232,6 +242,7 @@ export const sendAdminSetupEmail = async (email: string, name: string, setupLink
       replyTo: from,
     });
 
+    console.log(`[EMAIL] Admin setup email accepted by SMTP server for recipient: ${recipient} in ${Date.now() - start}ms`);
     return { success: true };
   } catch (error) {
     console.error('Failed to send Admin Setup email via SMTP:', error);
@@ -251,6 +262,7 @@ export const sendVoteConfirmationEmail = async (
   const recipient = forcedRecipient || email;
   const timestamp = recordedAt.toLocaleString();
   const textBody = `Hello ${name},\n\nYour ballot has been securely recorded for "${electionTitle}".\nBallots cast: ${voteCount}\nTime recorded: ${timestamp}\n\nIf you did not cast this vote, please contact the election administrator immediately.`;
+  const start = Date.now();
 
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
@@ -283,7 +295,9 @@ export const sendVoteConfirmationEmail = async (
 
   try {
     const transporter = initializeSmtpTransporter();
-    await transporter.verify();
+    if (process.env.NODE_ENV !== 'production') {
+      await transporter.verify();
+    }
 
     await transporter.sendMail({
       from,
@@ -294,6 +308,7 @@ export const sendVoteConfirmationEmail = async (
       replyTo: from,
     });
 
+    console.log(`[EMAIL] Vote confirmation email accepted by SMTP server for recipient: ${recipient} in ${Date.now() - start}ms`);
     return { success: true };
   } catch (error) {
     console.error('Failed to send vote confirmation email via SMTP:', error);
