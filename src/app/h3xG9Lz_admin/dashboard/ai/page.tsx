@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Brain, TrendingUp, AlertTriangle, Activity, Lightbulb } from "lucide-react";
-import Cookies from "js-cookie";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import { getAuditLogs } from "@/services/adminService";
+import apiClient from "@/services/api";
 
 interface ElectionLike {
   id: string;
@@ -43,16 +43,12 @@ const AIInsightsPage = () => {
       setLoading(true);
       setError("");
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const token = Cookies.get("admin_token");
-        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
         const [electionsRes, logsRes] = await Promise.all([
-          fetch(`${apiUrl}/admin/elections`, { headers }),
+          apiClient.get('/admin/elections'),
           getAuditLogs(),
         ]);
 
-        const electionsJson = await electionsRes.json();
+        const electionsJson = electionsRes.data;
         if (electionsJson.success) {
           setElections(electionsJson.data || []);
         }
@@ -292,4 +288,3 @@ const AIInsightsPage = () => {
 };
 
 export default AIInsightsPage;
-

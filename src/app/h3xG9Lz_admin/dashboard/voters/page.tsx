@@ -7,7 +7,7 @@ import {
   Upload, RefreshCw, CheckCircle2, Clock, Smartphone, Trash2, Play, Pause
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
-import Cookies from "js-cookie";
+import apiClient from "@/services/api";
 
 type BioStatus = "verified" | "not_enrolled" | "flagged";
 type VoteStatus = "voted" | "not_voted";
@@ -91,11 +91,6 @@ const Voters = () => {
   const [filterVote, setFilterVote] = useState("all");
   const [filterDept, setFilterDept] = useState("all");
 
-  const getAuthHeaders = (): Record<string, string> => {
-    const token = Cookies.get("admin_token");
-    return token ? { "Authorization": `Bearer ${token}` } : {};
-  };
-
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
@@ -136,18 +131,10 @@ const Voters = () => {
       formData.append('file', selectedFile);
       formData.append('mode', mode);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const token = Cookies.get("admin_token");
-
-      const res = await fetch(`${apiUrl}/admin/voters/import`, {
-        method: "POST",
-        headers: {
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: formData
+      const res = await apiClient.post('/admin/voters/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-
-      const data = await res.json();
+      const data = res.data;
 
       if (data.status === 'success') {
         setImportSuccess(data.message);
@@ -175,9 +162,8 @@ const Voters = () => {
   const fetchVoters = async () => {
     try {
       setIsLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${apiUrl}/admin/voters`, { headers: getAuthHeaders() });
-      const data = await res.json();
+      const res = await apiClient.get('/admin/voters');
+      const data = res.data;
       if (data.success) {
         setVoters(data.data.map((u: any) => {
           const loginHistory = Array.isArray(u.login_history) ? u.login_history : [];
@@ -232,13 +218,8 @@ const Voters = () => {
 
   const handleStatusUpdate = async (id: string, newStatus: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${apiUrl}/admin/voters/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ status: newStatus })
-      });
-      const data = await res.json();
+      const res = await apiClient.patch(`/admin/voters/${id}/status`, { status: newStatus });
+      const data = res.data;
       if (data.success) {
         setVoters(prev => prev.map(v => v.id === id ? { ...v, status: newStatus as any } : v));
         if (selected?.id === id) {
@@ -258,12 +239,8 @@ const Voters = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${apiUrl}/admin/voters/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
+      const res = await apiClient.delete(`/admin/voters/${deleteTarget.id}`);
+      const data = res.data;
       if (data.success) {
         setVoters(prev => prev.filter(v => v.id !== deleteTarget.id));
         if (selected?.id === deleteTarget.id) {

@@ -10,7 +10,14 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import Cookies from 'js-cookie';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const fallbackUrl = 'http://localhost:3001';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.trim() ||
+  (process.env.NODE_ENV === 'development' ? fallbackUrl : '');
+
+if (!API_BASE_URL) {
+  console.warn('[API] NEXT_PUBLIC_API_URL is not set. Requests may fail in production.');
+}
 
 /**
  * Axios instance with default configuration

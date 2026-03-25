@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Plus, Eye, Edit, CheckCircle2, Clock, XCircle, X, UserCircle, FileText, Upload, Ban, Search } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
-import Cookies from "js-cookie";
 import { supabase } from "@/lib/supabase";
+import apiClient from "@/services/api";
 
 type CandidateStatus = "approved" | "pending" | "rejected";
 type ViewMode = "list" | "add" | "detail";
@@ -86,32 +86,16 @@ const Candidates = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  const getAuthHeaders = (): Record<string, string> => {
-    const token = Cookies.get("admin_token");
-    return token ? { "Authorization": `Bearer ${token}` } : {};
-  };
-
   useEffect(() => {
     fetchInitialData();
   }, []);
 
-  const safeJson = async (res: Response) => {
-    const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { success: false, error: text || "Non-JSON response" };
-    }
-  };
-
   const fetchInitialData = async () => {
     setIsLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
       // Fetch Elections
-      const elRes = await fetch(`${apiUrl}/admin/elections`, { headers: getAuthHeaders() });
-      const elData = await safeJson(elRes);
+      const elRes = await apiClient.get('/admin/elections');
+      const elData = elRes.data;
       if (elData.success) {
         const now = new Date();
         setElectionsConfig(elData.data.map((e: any) => {
@@ -126,8 +110,8 @@ const Candidates = () => {
       }
 
       // Fetch Candidates
-      const candRes = await fetch(`${apiUrl}/admin/candidates`, { headers: getAuthHeaders() });
-      const candData = await safeJson(candRes);
+      const candRes = await apiClient.get('/admin/candidates');
+      const candData = candRes.data;
       if (candData.success) {
         setCandidates(candData.data.map((dbCand: any) => ({
           id: dbCand.id,
@@ -163,7 +147,6 @@ const Candidates = () => {
     setIsSubmitting(true);
     setSubmitError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const allowedElectionIds = new Set(
         electionsConfig.filter(e => e.status === "ongoing" || e.status === "upcoming").map(e => e.id)
       );
@@ -219,21 +202,18 @@ const Candidates = () => {
         manifestoUrl = publicUrl;
       }
 
-      const url = editingId ? `${apiUrl}/admin/candidates/${editingId}` : `${apiUrl}/admin/candidates`;
-      const method = editingId ? "PUT" : "POST";
+      const payload = {
+        ...form,
+        photoUrl,
+        manifestoUrl
+      };
 
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({
-          ...form,
-          photoUrl,
-          manifestoUrl
-        })
-      });
+      const response = editingId
+        ? await apiClient.put(`/admin/candidates/${editingId}`, payload)
+        : await apiClient.post('/admin/candidates', payload);
 
-      const data = await safeJson(response);
-      if (!response.ok || !data.success) {
+      const data = response.data;
+      if (!data.success) {
         throw new Error(data.error || data.message || "Failed to add candidate");
       }
 
@@ -250,14 +230,9 @@ const Candidates = () => {
 
   const handleStatusChange = async (id: string, newStatus: CandidateStatus) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/candidates/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ status: newStatus })
-      });
-      const data = await safeJson(response);
-      if (!response.ok || !data.success) throw new Error(data.error || data.message || "Failed to update status");
+      const response = await apiClient.patch(`/admin/candidates/${id}/status`, { status: newStatus });
+      const data = response.data;
+      if (!data.success) throw new Error(data.error || data.message || "Failed to update status");
 
       // Update local state without full refetch for crisp UI feel
       setCandidates(prev => prev.map(c => {
@@ -302,13 +277,9 @@ const Candidates = () => {
     if (!window.confirm(`Are you sure you want to permanently delete candidate: ${name}?`)) return;
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/candidates/${id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders()
-      });
-      const data = await safeJson(response);
-      if (!response.ok || !data.success) throw new Error(data.error || data.message || "Failed to delete candidate");
+      const response = await apiClient.delete(`/admin/candidates/${id}`);
+      const data = response.data;
+      if (!data.success) throw new Error(data.error || data.message || "Failed to delete candidate");
 
       // Remove local copy
       setCandidates(prev => prev.filter(c => c.id !== id));

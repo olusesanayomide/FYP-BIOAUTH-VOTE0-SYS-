@@ -7,7 +7,7 @@ import {
   AlertTriangle, Ban
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
-import Cookies from "js-cookie";
+import apiClient from "@/services/api";
 
 function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
   const [count, setCount] = useState(0);
@@ -38,11 +38,8 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const token = Cookies.get("admin_token");
-        const headers: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
-        const response = await fetch(`${apiUrl}/admin/stats`, { headers });
-        const data = await response.json();
+        const response = await apiClient.get('/admin/stats');
+        const data = response.data;
         if (data.success) {
           setStats(data.data);
         }

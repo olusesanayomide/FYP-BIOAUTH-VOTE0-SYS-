@@ -7,7 +7,7 @@ import {
   AlertTriangle, X, Calendar, Users, Shield, Fingerprint, BarChart3, Ban, Search, PlayCircle, Trash, Download, FileText, FileCode
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
-import Cookies from "js-cookie";
+import apiClient from "@/services/api";
 
 type ElectionStatus = "ongoing" | "upcoming" | "completed" | "suspended";
 type ViewMode = "list" | "create" | "detail";
@@ -74,11 +74,6 @@ const Elections = () => {
   const [isExporting, setIsExporting] = useState<"pdf" | "docx" | null>(null);
   const [showExportOptions, setShowExportOptions] = useState(false);
 
-  const getAuthHeaders = (): Record<string, string> => {
-    const token = Cookies.get("admin_token");
-    return token ? { "Authorization": `Bearer ${token}` } : {};
-  };
-
   // Fetch elections on mount
   useEffect(() => {
     fetchElections();
@@ -87,11 +82,8 @@ const Elections = () => {
   const fetchElections = async () => {
     setIsLoadingElections(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/elections`, {
-        headers: getAuthHeaders()
-      });
-      const data = await response.json();
+      const response = await apiClient.get('/admin/elections');
+      const data = response.data;
 
       if (data.success) {
         // Map database schema to frontend Election interface
@@ -144,11 +136,8 @@ const Elections = () => {
 
   const fetchAnalytics = async (id: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/elections/${id}/analytics`, {
-        headers: getAuthHeaders()
-      });
-      const data = await response.json();
+      const response = await apiClient.get(`/admin/elections/${id}/analytics`);
+      const data = response.data;
       if (data.success) {
         setElections(prev => prev.map(e => e.id === id ? {
           ...e,
@@ -207,24 +196,19 @@ const Elections = () => {
       if (end <= start) {
         throw new Error("End time must be later than start time.");
       }
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const url = editingId ? `${apiUrl}/admin/elections/${editingId}` : `${apiUrl}/admin/elections`;
-      const method = editingId ? "PUT" : "POST";
+      const payload = {
+        ...formData,
+        startDate: new Date(formData.startDate).toISOString(),
+        endDate: new Date(formData.endDate).toISOString(),
+        votingMethod: "Single Choice",
+        maxVotes: 1
+      };
+      const response = editingId
+        ? await apiClient.put(`/admin/elections/${editingId}`, payload)
+        : await apiClient.post('/admin/elections', payload);
 
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({
-          ...formData,
-          startDate: new Date(formData.startDate).toISOString(),
-          endDate: new Date(formData.endDate).toISOString(),
-          votingMethod: "Single Choice",
-          maxVotes: 1
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || !data.success) {
+      const data = response.data;
+      if (!data.success) {
         throw new Error(data.error || data.message || "Failed to create election");
       }
 
@@ -258,12 +242,7 @@ const Elections = () => {
   const handleSuspend = async () => {
     if (!showSuspendConfirm) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      await fetch(`${apiUrl}/admin/elections/${showSuspendConfirm}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ status: "suspended" })
-      });
+      await apiClient.patch(`/admin/elections/${showSuspendConfirm}/status`, { status: "suspended" });
       setShowSuspendConfirm(null);
       fetchElections(); // Refresh list to get new status
     } catch (error) {
@@ -273,12 +252,7 @@ const Elections = () => {
 
   const handleUnsuspend = async (id: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      await fetch(`${apiUrl}/admin/elections/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ status: "active" })
-      });
+      await apiClient.patch(`/admin/elections/${id}/status`, { status: "active" });
       fetchElections();
     } catch (error) {
       console.error("Failed to unsuspend election", error);
@@ -300,14 +274,11 @@ const Elections = () => {
 
   const handleResultsPublish = async (id: string, publish: boolean) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/elections/${id}/results`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ results_published: publish })
+      const response = await apiClient.patch(`/admin/elections/${id}/results`, {
+        results_published: publish
       });
-      const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.error || data.message || "Failed to update results visibility");
+      const data = response.data;
+      if (!data.success) throw new Error(data.error || data.message || "Failed to update results visibility");
 
       setElections(prev => prev.map(e => e.id === id ? { ...e, resultsPublished: publish } : e));
       setSelectedElection(prev => prev?.id === id ? { ...prev, resultsPublished: publish } : prev);
@@ -319,12 +290,7 @@ const Elections = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/elections/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) throw new Error("Failed to delete election");
+      await apiClient.delete(`/admin/elections/${deleteTarget.id}`);
       fetchElections();
       setShowDeleteConfirm(false);
       setDeleteTarget(null);
@@ -359,14 +325,12 @@ const Elections = () => {
     if (!selectedElection) return;
     setIsExporting(format);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/admin/elections/${selectedElection.id}/export?format=${format}`, {
-        headers: getAuthHeaders()
+      const response = await apiClient.get(`/admin/elections/${selectedElection.id}/export`, {
+        params: { format },
+        responseType: 'blob'
       });
 
-      if (!response.ok) throw new Error("Failed to generate report");
-
-      const blob = await response.blob();
+      const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
