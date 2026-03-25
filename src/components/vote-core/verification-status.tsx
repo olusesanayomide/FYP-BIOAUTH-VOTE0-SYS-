@@ -1,15 +1,30 @@
 "use client"
 
 import { ShieldCheck, Loader2 } from "lucide-react"
-import { useState, useEffect } from "react"
-import { getWebAuthnRegistrationOptions, verifyWebAuthnRegistration, getCurrentUser } from "@/services/authService"
+import { useState, useEffect, useMemo } from "react"
+import { getWebAuthnRegistrationOptions, verifyWebAuthnRegistration, getCurrentUser, requestLoginOtp, verifyLoginOtp } from "@/services/authService"
+import { useToast } from "@/hooks/use-toast"
 
 type BiometricState = "idle" | "scanning" | "success" | "error";
 
-export function VerificationStatus({ compact = false }: { compact?: boolean }) {
+export function VerificationStatus({
+  compact = false,
+  allowReRegister = false,
+}: {
+  compact?: boolean;
+  allowReRegister?: boolean;
+}) {
   const [isVerified, setIsVerified] = useState(false);
   const [biometricState, setBiometricState] = useState<BiometricState>("idle");
   const [biometricError, setBiometricError] = useState("");
+  const { toast } = useToast();
+  const [otpStage, setOtpStage] = useState<"idle" | "sent" | "verified">("idle");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [userIdentifier, setUserIdentifier] = useState<string>("");
+  const [showOtpModal, setShowOtpModal] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -17,9 +32,90 @@ export function VerificationStatus({ compact = false }: { compact?: boolean }) {
       try {
         const user = JSON.parse(storedUser);
         setIsVerified(user.biometricStatus === 'VERIFIED' || user.registration_completed === true);
+        setUserIdentifier(user.email || user.matricNumber || user.matric_no || "");
       } catch (e) { }
     }
+    const loadUser = async () => {
+      try {
+        const resp = await getCurrentUser();
+        if (resp.success && resp.data) {
+          setUserIdentifier(resp.data.email || resp.data.matricNumber || resp.data.matric_no || "");
+        }
+      } catch (e) { }
+    };
+    loadUser();
   }, []);
+
+  const requiresOtp = useMemo(() => {
+    return allowReRegister || !isVerified;
+  }, [allowReRegister, isVerified]);
+
+  const isReRegisterFlow = allowReRegister && isVerified;
+  const resetOtpState = () => {
+    setOtpStage("idle");
+    setOtpCode("");
+    setOtpError("");
+    setOtpSending(false);
+    setOtpVerifying(false);
+  };
+
+  const handleRequestOtp = async () => {
+    if (!userIdentifier) {
+      setOtpError("Missing email or matric number for OTP.");
+      return;
+    }
+    setOtpSending(true);
+    setOtpError("");
+    try {
+      const resp = await requestLoginOtp(userIdentifier);
+      if (resp.success) {
+        setOtpStage("sent");
+        toast({ title: "OTP sent", description: "Check your email for the verification code." });
+      } else {
+        setOtpError(resp.error || "Failed to send OTP");
+        toast({ title: "OTP failed", description: resp.error || "Failed to send OTP" });
+      }
+    } catch (e: any) {
+      setOtpError(e.message || "Failed to send OTP");
+      toast({ title: "OTP failed", description: e.message || "Failed to send OTP" });
+    }
+    setOtpSending(false);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!userIdentifier) {
+      setOtpError("Missing email or matric number for OTP.");
+      return;
+    }
+    if (!otpCode || otpCode.length < 6) {
+      setOtpError("Enter the 6-digit OTP.");
+      return;
+    }
+    setOtpVerifying(true);
+    setOtpError("");
+    try {
+      const resp = await verifyLoginOtp(userIdentifier, otpCode);
+      if (resp.success) {
+        setOtpStage("verified");
+        setOtpCode("");
+        toast({ title: "OTP verified", description: "Proceeding to biometric registration..." });
+        if (isReRegisterFlow && showOtpModal) {
+          setShowOtpModal(false);
+          handleStartVerification();
+          resetOtpState();
+          setOtpVerifying(false);
+          return;
+        }
+      } else {
+        setOtpError(resp.error || "OTP verification failed");
+        toast({ title: "OTP failed", description: resp.error || "OTP verification failed" });
+      }
+    } catch (e: any) {
+      setOtpError(e.message || "OTP verification failed");
+      toast({ title: "OTP failed", description: e.message || "OTP verification failed" });
+    }
+    setOtpVerifying(false);
+  };
 
   const handleStartVerification = async () => {
     setBiometricState("scanning");
@@ -53,6 +149,10 @@ export function VerificationStatus({ compact = false }: { compact?: boolean }) {
           localStorage.setItem("user", JSON.stringify(freshUserResp.data));
           setIsVerified(freshUserResp.data.biometricStatus === 'VERIFIED');
           setBiometricState("success");
+          toast({
+            title: "Biometric updated",
+            description: "Your biometric registration is complete.",
+          });
         } else {
           // Fallback if profile fetch fails
           setBiometricState("success");
@@ -66,14 +166,26 @@ export function VerificationStatus({ compact = false }: { compact?: boolean }) {
               localStorage.setItem("user", JSON.stringify(user));
             } catch (e) { }
           }
+          toast({
+            title: "Biometric updated",
+            description: "Your biometric registration is complete.",
+          });
         }
       } else {
         setBiometricState("error");
         setBiometricError(verifyResponse.error || "Biometric registration failed on server");
+        toast({
+          title: "Biometric failed",
+          description: verifyResponse.error || "Biometric registration failed on server",
+        });
       }
     } catch (error: any) {
       setBiometricState("error");
       setBiometricError(error.message || "Biometric capture failed globally");
+      toast({
+        title: "Biometric failed",
+        description: error.message || "Biometric capture failed globally",
+      });
     }
   };
 
@@ -137,14 +249,58 @@ export function VerificationStatus({ compact = false }: { compact?: boolean }) {
           {biometricState === "error"
             ? <span className="text-destructive font-medium">{biometricError}</span>
             : isVerified
-              ? "Your identity has been successfully verified. You now have full access to participate in all active elections securely."
+              ? (allowReRegister
+                ? "Re-register your biometrics to use a new device or refresh your secure credential."
+                : "Your identity has been successfully verified. You now have full access to participate in all active elections securely.")
               : "Your identity verification is pending. Please complete the biometric scan to authorize your account for voting."}
         </p>
 
-        {!isVerified && (
+        {requiresOtp && otpStage !== "verified" && !isReRegisterFlow && (
+          <div className={`mt-4 w-full ${compact ? "" : "max-w-sm"}`}>
+            <div className="flex flex-col gap-2">
+              <input
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Enter 6-digit OTP"
+                className="h-11 rounded-lg border border-border/60 bg-background/70 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+              />
+              {otpError && <p className="text-xs text-destructive">{otpError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleRequestOtp}
+                  disabled={otpSending}
+                  className="flex-1 h-11 rounded-lg border border-border/60 bg-muted/30 text-xs font-semibold text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
+                >
+                  {otpSending ? "Sending..." : "Send OTP"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyOtp}
+                  disabled={otpVerifying}
+                  className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                >
+                  {otpVerifying ? "Verifying..." : "Verify OTP"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(!isVerified || allowReRegister) && (
           <button
-            onClick={handleStartVerification}
-            disabled={biometricState === "scanning"}
+            onClick={() => {
+              if (isReRegisterFlow) {
+                resetOtpState();
+                setShowOtpModal(true);
+                handleRequestOtp();
+                return;
+              }
+              handleStartVerification();
+            }}
+            disabled={biometricState === "scanning" || (requiresOtp && otpStage !== "verified" && !isReRegisterFlow)}
             className={`mt-4 rounded-xl flex items-center gap-2 justify-center bg-gradient-to-r from-primary to-primary/80 px-6 py-2.5 text-xs font-semibold text-primary-foreground transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(139,92,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed ${compact ? "w-full" : ""}`}
           >
             {biometricState === "scanning" ? (
@@ -152,8 +308,51 @@ export function VerificationStatus({ compact = false }: { compact?: boolean }) {
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Scanning...
               </>
-            ) : "Start Verification"}
+            ) : (isVerified ? "Re-register Biometrics" : "Start Verification")}
           </button>
+        )}
+
+        {showOtpModal && isReRegisterFlow && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-border/60 bg-card/95 p-5 shadow-xl">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-foreground">Verify OTP</h4>
+                <button
+                  onClick={() => {
+                    setShowOtpModal(false);
+                    resetOtpState();
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Close
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                We sent a verification code to your email. Enter it to continue.
+              </p>
+              <div className="flex flex-col gap-2">
+                <input
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Enter 6-digit OTP"
+                  className="h-11 rounded-lg border border-border/60 bg-background/70 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
+                {otpError && <p className="text-xs text-destructive">{otpError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                  disabled={otpVerifying}
+                  className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                >
+                  {otpVerifying ? "Verifying..." : "Verify OTP"}
+                </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

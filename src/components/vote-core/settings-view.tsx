@@ -105,6 +105,8 @@ export function SettingsView() {
     },
   ]
 
+  const isVerified = user?.biometricStatus === 'VERIFIED' || user?.registration_completed === true;
+
   return (
     <div className="animate-fade-in-up">
       <h2 className="mb-6 text-lg font-semibold text-foreground">Settings</h2>
@@ -112,7 +114,22 @@ export function SettingsView() {
       <div className="mb-6">
         <h3 className="mb-3 text-sm font-semibold text-foreground">Verification Status</h3>
         <div className="glass rounded-xl p-4">
-          <VerificationStatus compact />
+          {!isVerified ? (
+            <VerificationStatus compact />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Biometric verification</span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Verified
+                </span>
+              </div>
+              <VerificationStatus compact allowReRegister />
+              <p className="text-xs text-muted-foreground">
+                Need to use a new device? Re-register your biometrics to keep your account secure.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
