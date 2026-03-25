@@ -24,7 +24,7 @@ const CTASection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-3xl md:text-5xl font-bold mb-3"
+          className="text-[clamp(1.9rem,4.2vw,3rem)] font-bold mb-3"
         >
           Ready to Conduct a Secure Election?
         </motion.h2>
@@ -46,7 +46,7 @@ const CTASection = () => {
           <button
             onClick={handleLoginClick}
             disabled={isNavigatingToLogin}
-            className="gradient-cta text-primary-foreground font-semibold px-8 py-3.5 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm md:text-base inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="gradient-cta text-primary-foreground font-semibold px-8 py-3.5 rounded-xl transition-all duration-300 hover:scale-[1.02] glow-cta text-sm md:text-base inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed min-h-12 w-full sm:w-auto justify-center"
           >
             {isNavigatingToLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {isNavigatingToLogin ? "Opening Login..." : "Proceed to Login"}

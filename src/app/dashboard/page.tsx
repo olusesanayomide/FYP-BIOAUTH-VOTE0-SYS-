@@ -90,7 +90,7 @@ export default function VoterDashboard() {
 
       {/* Main Content */}
       <main className="relative z-10 pt-[72px] lg:pl-[240px]">
-        <div className="mx-auto max-w-4xl px-6 py-10 md:px-10 md:py-14">
+        <div className="mx-auto max-w-4xl px-4 pt-8 pb-24 sm:px-5 md:px-8 md:py-14 fab-safe">
           {renderContent()}
         </div>
       </main>

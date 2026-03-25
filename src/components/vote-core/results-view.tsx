@@ -132,9 +132,9 @@ export function ResultsView() {
   }
 
   return (
-    <div className="animate-fade-in-up w-full max-w-5xl mx-auto">
+    <div className="animate-fade-in-up w-full max-w-[min(100%,72rem)] mx-auto">
       {/* Header Area */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">Election Status Center</h2>
           <p className="text-sm text-muted-foreground mt-1">Transparent progress, integrity signals, and certified results.</p>
@@ -145,7 +145,7 @@ export function ResultsView() {
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl p-6 mb-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border/50 relative overflow-hidden"
+        className="glass rounded-2xl p-5 sm:p-6 mb-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border/50 relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[80px] -z-10 translate-x-1/2 -translate-y-1/2 pointer-events-none" />
 
@@ -154,7 +154,7 @@ export function ResultsView() {
         </label>
 
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 max-w-full sm:max-w-md">
             <select
               value={selectedId}
               onChange={(e) => {
@@ -184,7 +184,7 @@ export function ResultsView() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 onClick={() => loadResults(selectedId)}
                 disabled={resultLoading}
-                className="h-12 px-6 rounded-xl text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap group"
+                className="h-12 px-6 rounded-xl text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap group min-w-[48px]"
               >
                 <RefreshCcw className={`w-4 h-4 ${resultLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
                 {resultLoading ? 'Syncing...' : 'Refresh Feed'}

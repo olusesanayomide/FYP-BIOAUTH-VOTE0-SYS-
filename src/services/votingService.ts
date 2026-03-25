@@ -50,6 +50,8 @@ export interface Election {
   required_level?: string;
   require_biometrics?: boolean;
   results_published?: boolean;
+  eligible_voters?: number;
+  registeredVoters?: number;
   positions: Position[];
 }
 

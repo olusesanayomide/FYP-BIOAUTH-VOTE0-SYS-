@@ -37,15 +37,15 @@ export function StatusCards({
   ]
 
   return (
-    <div className="stagger-children grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="stagger-children flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 pr-6 scroll-px-4 sm:mx-0 sm:px-0 sm:pr-0 sm:grid sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => (
         <div
           key={card.title}
-          className="glass glass-hover group rounded-xl p-6 transition-all duration-300 hover:-translate-y-1"
+          className="glass glass-hover group rounded-xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 min-w-[220px] sm:min-w-0"
         >
           <div className="flex items-start justify-between">
-            <div className="space-y-3">
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <div className="space-y-2">
+              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 {card.title}
               </p>
               <p className={`text-sm font-semibold ${card.color}`}>

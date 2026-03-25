@@ -15,14 +15,14 @@ const HeroSection = () => {
   };
 
   return (
-    <section id="home" className="relative min-h-[88vh] flex items-center overflow-hidden bg-gradient-to-b from-background via-background to-background dark:from-[#060b1a] dark:via-[#071633] dark:to-[#060b1a]">
+    <section id="home" className="relative min-h-[clamp(30rem,88vh,52rem)] flex items-center overflow-hidden bg-gradient-to-b from-background via-background to-background dark:from-[#060b1a] dark:via-[#071633] dark:to-[#060b1a]">
       <div className="absolute inset-0 grid-pattern" />
-      <div className="absolute top-1/4 left-1/4 w-[420px] h-[420px] rounded-full bg-primary/10 dark:bg-[#3b82f6]/20 blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-[320px] h-[320px] rounded-full bg-accent/10 dark:bg-[#2563eb]/20 blur-[130px] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/4 w-[clamp(220px,45vw,420px)] h-[clamp(220px,45vw,420px)] rounded-full bg-primary/10 dark:bg-[#3b82f6]/20 blur-[130px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-[clamp(180px,38vw,320px)] h-[clamp(180px,38vw,320px)] rounded-full bg-accent/10 dark:bg-[#2563eb]/20 blur-[130px] pointer-events-none" />
 
-      <div className="relative z-10 max-w-7xl mx-auto w-full px-6 py-24 md:py-28">
+      <div className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 py-20 md:py-28">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.08] max-w-[22ch] mx-auto">
+          <h1 className="text-[clamp(2.25rem,4.8vw,3.75rem)] font-bold leading-[1.08] max-w-[22ch] mx-auto">
             {"Online Biometric Voting System".split(" ").map((word, i) => (
               <motion.span
                 key={i}
@@ -39,7 +39,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25 }}
-            className="mx-auto mt-8 mb-7 w-24 h-24 rounded-full border border-primary/30 bg-card/70 dark:bg-white/[0.04] backdrop-blur-xl flex items-center justify-center"
+            className="mx-auto mt-8 mb-7 w-20 h-20 sm:w-24 sm:h-24 rounded-full border border-primary/30 bg-card/70 dark:bg-white/[0.04] backdrop-blur-xl flex items-center justify-center"
           >
             <Fingerprint className="w-10 h-10 text-primary" />
           </motion.div>
@@ -74,7 +74,7 @@ const HeroSection = () => {
             <button
               onClick={handleLoginClick}
               disabled={isNavigatingToLogin}
-             className="bg-primary text-primary-foreground font-medium px-7 py-3 rounded-lg border border-primary-foreground/10 shadow-md transition-all duration-200 hover:bg-primary/90 active:scale-[0.97] inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+             className="bg-primary text-primary-foreground font-medium px-7 py-3 rounded-lg border border-primary-foreground/10 shadow-md transition-all duration-200 hover:bg-primary/90 active:scale-[0.97] inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm min-h-12 w-full sm:w-auto justify-center"
             >
               {isNavigatingToLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {isNavigatingToLogin ? "Opening Login..." : "Secure Biometric Login"}

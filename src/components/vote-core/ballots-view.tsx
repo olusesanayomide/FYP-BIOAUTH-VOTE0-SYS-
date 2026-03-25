@@ -77,7 +77,7 @@ export function BallotsView() {
 
   return (
     <div className="animate-fade-in-up">
-      <h2 className="mb-6 text-lg font-semibold text-foreground">My Ballots</h2>
+      <h2 className="mb-4 text-lg font-semibold text-foreground px-1">My Ballots</h2>
 
       {elections.length === 0 ? (
         <div className="glass flex flex-col items-center justify-center rounded-xl p-8 py-16 text-center">
@@ -85,13 +85,14 @@ export function BallotsView() {
           <p className="mt-2 text-sm text-muted-foreground">There are currently no active or upcoming elections.</p>
         </div>
       ) : (
-        <div className="stagger-children space-y-4">
+        <div className="stagger-children space-y-4 px-1">
           {elections.map((ballot) => (
             <ElectionCard
               key={ballot.id}
               election={ballot}
               isVerified={user?.registrationCompleted ?? user?.registration_completed}
               initialHasVoted={votedElectionIds.has(ballot.id)}
+              compact
             />
           ))}
         </div>

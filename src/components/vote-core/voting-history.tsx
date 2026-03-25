@@ -47,7 +47,7 @@ export function VotingHistory() {
             <div key={item.electionId} className="glass overflow-hidden rounded-xl transition-all duration-300">
               <div
                 onClick={() => toggleExpand(item.electionId)}
-                className="flex cursor-pointer items-center justify-between px-6 py-5 hover:bg-muted/10"
+                className="flex cursor-pointer items-center justify-between px-6 py-5 hover:bg-muted/10 min-h-12"
               >
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-foreground">

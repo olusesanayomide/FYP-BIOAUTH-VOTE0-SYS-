@@ -6,7 +6,7 @@ import { ElectionCard, NoElectionState } from "./election-card"
 import { getElections, Election } from "@/services/votingService"
 import { getSystemSettings } from "@/services/adminService"
 import { getCurrentUser } from "@/services/authService"
-import { Loader2, AlertCircle, RefreshCw } from "lucide-react"
+import { Loader2, AlertCircle, RefreshCw, ChevronRight } from "lucide-react"
 import { useVotedElections } from "@/hooks/useVotedElections"
 
 export function DashboardContent() {
@@ -116,7 +116,7 @@ export function DashboardContent() {
         <p className="text-destructive font-medium text-center max-w-sm">{error}</p>
         <button
           onClick={loadData}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors min-h-12"
         >
           <RefreshCw className="h-4 w-4" />
           Retry
@@ -131,7 +131,7 @@ export function DashboardContent() {
     <div className="space-y-10">
       {/* Welcome Section */}
       <div className="animate-fade-in-up">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl text-balance">
+        <h1 className="text-[clamp(1.75rem,4.2vw,2.5rem)] font-bold tracking-tight text-foreground text-balance">
           Welcome back, {user?.name?.split(' ')[0] || "Voter"}.
         </h1>
         <p className="mt-2 text-base text-muted-foreground">
@@ -159,9 +159,20 @@ export function DashboardContent() {
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               </div>
               <div className="grid gap-6">
-                {ongoingElections.map(election => (
+                {ongoingElections.slice(0, 2).map(election => (
                   <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
+                {ongoingElections.length > 2 && (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem("voter_active_view", "ballots");
+                      window.dispatchEvent(new CustomEvent("voter:set-active-view", { detail: "ballots" }));
+                    }}
+                    className="mt-4 inline-flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                  >
+                    View all ballots <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </section>
           )}
@@ -170,20 +181,42 @@ export function DashboardContent() {
             <section className="space-y-4">
               <h2 className="text-2xl font-bold tracking-tight">Upcoming Elections</h2>
               <div className="grid gap-6">
-                {upcomingElections.map(election => (
+                {upcomingElections.slice(0, 2).map(election => (
                   <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
+                {upcomingElections.length > 2 && (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem("voter_active_view", "ballots");
+                      window.dispatchEvent(new CustomEvent("voter:set-active-view", { detail: "ballots" }));
+                    }}
+                    className="mt-4 inline-flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                  >
+                    View all ballots <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </section>
           )}
 
           {completedElections.length > 0 && (
-            <section className="space-y-4">
-              <h2 className="text-2xl font-bold tracking-tight text-muted-foreground">Completed Elections</h2>
-              <div className="grid gap-6 opacity-80">
-                {completedElections.map(election => (
+            <section className="space-y-3">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-muted-foreground leading-tight">Completed Elections</h2>
+              <div className="grid gap-4 sm:gap-6 opacity-80">
+                {completedElections.slice(0, 2).map(election => (
                   <ElectionCard key={election.id} election={election} isVerified={user?.biometricStatus === 'VERIFIED'} institutionName={universityName} initialHasVoted={votedElectionIds.has(election.id)} />
                 ))}
+                {completedElections.length > 2 && (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem("voter_active_view", "ballots");
+                      window.dispatchEvent(new CustomEvent("voter:set-active-view", { detail: "ballots" }));
+                    }}
+                    className="mt-4 inline-flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                  >
+                    View all ballots <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </section>
           )}

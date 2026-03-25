@@ -176,12 +176,12 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
   }
 
   return (
-    <header className="glass fixed top-0 right-0 left-0 z-40 flex h-[72px] items-center justify-between px-6">
+    <header className="glass fixed top-0 right-0 left-0 z-40 flex h-[72px] items-center justify-between px-4 sm:px-6">
       {/* Left: Logo + Mobile Menu */}
       <div className="flex items-center gap-4">
         <button
           onClick={onToggleSidebar}
-          className="text-muted-foreground transition-colors duration-200 hover:text-secondary lg:hidden"
+          className="text-muted-foreground transition-colors duration-200 hover:text-secondary lg:hidden touch-target flex items-center justify-center"
           aria-label="Toggle sidebar menu"
         >
           <Menu className="h-5 w-5" />
@@ -196,7 +196,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
               </span>
             </div>
           )}
-          <span className="text-lg font-bold tracking-widest text-foreground">
+          <span className="hidden sm:inline text-[clamp(0.95rem,2.6vw,1.125rem)] font-bold tracking-wide text-foreground whitespace-nowrap truncate max-w-[40vw] sm:max-w-[50vw]">
             {systemName}
           </span>
         </div>
@@ -211,14 +211,16 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-3">
-        <ThemeToggle />
+        <div className="touch-target flex items-center justify-center hidden md:flex">
+          <ThemeToggle />
+        </div>
         <div className="relative">
           <button
             onClick={() => {
               setShowNotifMenu((v) => !v)
               setShowProfileMenu(false)
             }}
-            className="group relative rounded-lg p-2 text-muted-foreground transition-all duration-200 hover:bg-secondary/10 hover:text-secondary"
+            className="group relative rounded-lg p-2 text-muted-foreground transition-all duration-200 hover:bg-secondary/10 hover:text-secondary touch-target flex items-center justify-center"
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
@@ -229,15 +231,15 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
             )}
           </button>
           {showNotifMenu && (
-            <div className="absolute right-0 mt-2 w-[340px] rounded-xl border border-border/60 bg-card/95 shadow-xl backdrop-blur-md z-[120]">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border/40">
+            <div className="fixed left-1/2 -translate-x-1/2 top-[80px] w-[min(90vw,320px)] sm:absolute sm:left-auto sm:right-2 sm:top-auto sm:translate-x-0 sm:mt-2 sm:w-[340px] max-h-[70vh] overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-xl backdrop-blur-md z-[120]">
+              <div className="flex flex-col gap-2 px-3 py-2 border-b border-border/40 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs font-semibold text-foreground">Notifications</p>
-                <div className="flex items-center gap-2">
-                  <button onClick={markAllRead} className="text-[11px] text-primary hover:underline">Mark all read</button>
-                  <button onClick={clearRead} className="text-[11px] text-muted-foreground hover:underline">Clear read</button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={markAllRead} className="text-[10px] sm:text-[11px] text-primary hover:underline min-h-10 px-2">Mark all read</button>
+                  <button onClick={clearRead} className="text-[10px] sm:text-[11px] text-muted-foreground hover:underline min-h-10 px-2">Clear read</button>
                 </div>
               </div>
-              <div className="max-h-[320px] overflow-auto p-2 space-y-1">
+              <div className="max-h-[calc(70vh-52px)] overflow-auto p-2 space-y-1">
                 {notifications.map((n) => (
                   <div key={n.id} className={`rounded-lg border border-border/40 px-3 py-2.5 ${n.isRead ? "bg-muted/10 opacity-70" : "bg-muted/20"}`}>
                     <div className="flex items-start gap-2">
@@ -263,7 +265,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
               setShowProfileMenu((v) => !v)
               setShowNotifMenu(false)
             }}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary transition-all duration-200 hover:bg-primary/30"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary transition-all duration-200 hover:bg-primary/30"
             aria-label="Profile menu"
           >
             {userInitials}
@@ -276,7 +278,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
               </div>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors min-h-12"
               >
                 <LogOut className="h-4 w-4" />
                 Sign out
