@@ -54,6 +54,19 @@ export function ResultsView() {
 
   const resultsPublished = Boolean(selectedElection?.results_published);
 
+  const closedAtText = useMemo(() => {
+    if (!selectedElection?.endDate) return "—";
+    const date = new Date(selectedElection.endDate);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [selectedElection?.endDate]);
+
   const turnoutInfo = useMemo(() => {
     const totalVotes = result?.totalVotes ?? 0;
     const eligible =
@@ -145,11 +158,11 @@ export function ResultsView() {
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl p-5 sm:p-6 mb-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border/50 relative overflow-hidden"
+        className="glass rounded-2xl p-4 sm:p-5 mb-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-border/50 relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[80px] -z-10 translate-x-1/2 -translate-y-1/2 pointer-events-none" />
 
-        <label className="block text-sm font-medium text-foreground/80 mb-3 flex items-center gap-2">
+        <label className="block text-sm font-medium text-foreground/80 mb-2 flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-primary" /> Select Active Election
         </label>
 
@@ -162,7 +175,7 @@ export function ResultsView() {
                 setSelectedId(id);
                 loadResults(id);
               }}
-              className="w-full h-12 px-4 rounded-xl bg-background/50 backdrop-blur-md border border-border/60 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all appearance-none shadow-sm cursor-pointer hover:bg-background/80"
+              className="w-full h-11 px-4 rounded-xl bg-background/50 backdrop-blur-md border border-border/60 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all appearance-none shadow-sm cursor-pointer hover:bg-background/80"
             >
               <option value="">-- Dropdown to choose an election --</option>
               {elections.map((e) => (
@@ -184,7 +197,7 @@ export function ResultsView() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 onClick={() => loadResults(selectedId)}
                 disabled={resultLoading}
-                className="h-12 px-6 rounded-xl text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap group min-w-[48px]"
+                className="h-11 px-6 rounded-xl text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap group min-w-[48px]"
               >
                 <RefreshCcw className={`w-4 h-4 ${resultLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
                 {resultLoading ? 'Syncing...' : 'Refresh Feed'}
@@ -309,43 +322,40 @@ export function ResultsView() {
             <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
 
             <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-              <div>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold tracking-wider uppercase mb-3 border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Final Results
-                </span>
-                <h3 className="text-2xl md:text-3xl font-bold text-foreground">{result.electionTitle}</h3>
-              </div>
+  <div className="space-y-3">
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold tracking-wider uppercase border border-emerald-500/20">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Final Results
+    </span>
+    <h3 className="text-2xl md:text-3xl font-bold text-foreground">{result.electionTitle}</h3>
+    <div className="text-sm text-muted-foreground">
+      <span className="font-semibold text-foreground">{result.totalVotes.toLocaleString()}</span> total votes
+    </div>
+    <div className="grid gap-2 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/40 px-3 py-2">
+        <span className="uppercase tracking-widest text-[10px] text-muted-foreground">Closed At</span>
+        <span className="font-semibold text-foreground">{closedAtText}</span>
+      </div>
+    </div>
+  </div>
 
-              <div className="flex flex-col items-start md:items-end gap-4">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="h-16 w-16 rounded-full p-1"
-                    style={{
-                      background:
-                        turnoutInfo.pct !== null
-                          ? `conic-gradient(hsl(var(--primary)) ${turnoutInfo.pct}%, hsl(var(--muted)) ${turnoutInfo.pct}% 100%)`
-                          : "hsl(var(--muted))"
-                    }}
-                  >
-                    <div className="h-full w-full rounded-full bg-background flex items-center justify-center text-xs font-semibold text-foreground">
-                      {turnoutInfo.pct !== null ? `${turnoutInfo.pct}%` : "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1 uppercase tracking-widest font-medium">Total Turnout</p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl md:text-5xl font-black text-foreground">
-                        {result.totalVotes.toLocaleString()}
-                      </span>
-                      <span className="text-sm text-muted-foreground font-medium">votes</span>
-                    </div>
-                    {turnoutInfo.pct !== null && (
-                      <span className="text-xs text-muted-foreground mt-1">Turnout: {turnoutInfo.pct}%</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+  <div className="flex flex-col items-center md:items-end gap-4">
+    <div className="flex items-center justify-center">
+      <div
+        className="h-16 w-16 rounded-full p-1"
+        style={{
+          background:
+            turnoutInfo.pct !== null
+              ? `conic-gradient(hsl(var(--primary)) ${turnoutInfo.pct}%, hsl(var(--muted)) ${turnoutInfo.pct}% 100%)`
+              : "hsl(var(--muted))"
+        }}
+      >
+        <div className="h-full w-full rounded-full bg-background flex items-center justify-center text-xs font-semibold text-foreground">
+          {turnoutInfo.pct !== null ? `${turnoutInfo.pct}%` : "—"}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
           </motion.div>
 
           {/* Render Positions */}
@@ -386,7 +396,7 @@ export function ResultsView() {
                       sortedCandidates.map((c, index) => {
                         const pct = calculatePercentage(c.voteCount, totalPositionVotes);
                         const barColors = [
-                          "bg-primary",
+                          "bg-amber-400",
                           "bg-emerald-500",
                           "bg-blue-500",
                           "bg-amber-500",
@@ -419,7 +429,7 @@ export function ResultsView() {
                                 initial={{ width: 0 }}
                                 animate={{ width: `${pct}%` }}
                                 transition={{ duration: 1.2, ease: "easeOut", delay: index * 0.1 }}
-                                className={`h-full rounded-full ${barColor}`}
+                                className={`h-full rounded-full ${barColor} ${index === 0 && hasVotes ? "shadow-[0_0_12px_rgba(251,191,36,0.7)] ring-1 ring-amber-300/60" : ""}`}
                               />
                             </div>
                           </div>
@@ -427,6 +437,18 @@ export function ResultsView() {
                       })
                     )}
                   </div>
+
+                  {sortedCandidates.length > 0 && hasVotes && (
+                    <div className="mt-6">
+                      <button
+                        type="button"
+                        className="w-full h-11 rounded-xl border border-amber-300/40 bg-amber-400/10 text-amber-200 font-semibold text-sm hover:bg-amber-400/20 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span className="inline-flex h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+                        View Audit Log
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               );
             })}
@@ -436,3 +458,4 @@ export function ResultsView() {
     </div>
   );
 }
+

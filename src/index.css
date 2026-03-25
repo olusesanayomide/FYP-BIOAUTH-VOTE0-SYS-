@@ -307,6 +307,11 @@
   100% { transform: translateX(200%) rotate(15deg); }
 }
 
+@keyframes loading-bar {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
 @keyframes count-pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }

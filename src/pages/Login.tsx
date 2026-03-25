@@ -16,13 +16,19 @@ const Login = () => {
   const [errors, setErrors] = useState<{ email?: string }>({});
   const [shakeField, setShakeField] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [authLoading, setAuthLoading] = useState<"none" | "biometric" | "otp">("none");
   const [biometricProgress, setBiometricProgress] = useState(0);
+  const [showAuthOptions, setShowAuthOptions] = useState(false);
+  const [emailValidity, setEmailValidity] = useState<"valid" | "invalid" | "empty">("empty");
 
   // OTP Fallback states
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
+  const isBiometricLoading = authLoading === "biometric";
+  const isOtpLoading = authLoading === "otp";
+  const isAnyLoading = authLoading !== "none" || loading || otpLoading;
 
   const getFriendlyWebAuthnError = (err: any) => {
     const name = err?.name || "";
@@ -53,12 +59,46 @@ const Login = () => {
     return "Biometric verification failed. Please try again or use OTP fallback.";
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const isValidEmailFormat = (value: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  };
+
+  const isValidMatricFormat = (value: string) => {
+    // Allow common matric patterns like 22/2846, 22-2846, or alnum with separators
+    return /^[A-Za-z0-9]+([\/-][A-Za-z0-9]+)+$/.test(value.trim());
+  };
+
+  const isValidIdentifier = (value: string) => {
+    return isValidEmailFormat(value) || isValidMatricFormat(value);
+  };
+
+  const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email) {
+      setErrors({ email: "Matric Number / Email is required" });
+      triggerShake("email");
+      setShowAuthOptions(false);
+      return;
+    }
+    if (!isValidIdentifier(email)) {
+      setErrors({ email: "Enter a valid matric number or email address" });
+      triggerShake("email");
+      setShowAuthOptions(false);
+      return;
+    }
+    setErrors({});
+    setShowAuthOptions(true);
+  };
+
+  const handleSubmit = async () => {
     const newErrors: typeof errors = {};
 
     if (!email) {
-      newErrors.email = "Voter ID / Email is required";
+      newErrors.email = "Matric Number / Email is required";
+      triggerShake("email");
+    }
+    if (!isValidIdentifier(email)) {
+      newErrors.email = "Enter a valid matric number or email address";
       triggerShake("email");
     }
 
@@ -69,6 +109,7 @@ const Login = () => {
 
     setErrors({});
     setLoading(true);
+    setAuthLoading("biometric");
 
     try {
       // Request authentication options from backend (public passwordless flow)
@@ -76,6 +117,7 @@ const Login = () => {
       if (!optionsResp.success || !optionsResp.data) {
         setErrors({ email: optionsResp.error || 'Failed to start biometric authentication' });
         setLoading(false);
+        setAuthLoading("none");
         return;
       }
 
@@ -96,6 +138,7 @@ const Login = () => {
         console.error("Error name:", err.name, "Error message:", err.message);
 
         setLoading(false);
+        setAuthLoading("none");
         setErrors({ email: getFriendlyWebAuthnError(err) });
         setStage('credentials');
         return;
@@ -106,17 +149,20 @@ const Login = () => {
 
       if (verifyResp.success) {
         setLoading(false);
+        setAuthLoading("none");
         setStage('success');
         // token stored in authService on success
         startBiometricScan();
       } else {
         setLoading(false);
+        setAuthLoading("none");
         setErrors({ email: verifyResp.error || 'Biometric verification failed' });
         setStage('credentials');
       }
     } catch (err: any) {
       console.error("[WebAuthn Auth] Top-level error:", err);
       setLoading(false);
+      setAuthLoading("none");
       setErrors({ email: getFriendlyWebAuthnError(err) });
       setStage('credentials');
     }
@@ -124,13 +170,15 @@ const Login = () => {
 
   const handleRequestOtpFallback = async () => {
     if (!email) {
-      setErrors({ email: "Voter ID / Email is required for OTP" });
+      setErrors({ email: "Matric Number / Email is required for OTP" });
       triggerShake("email");
       return;
     }
     setOtpLoading(true);
+    setAuthLoading("otp");
     const resp = await requestLoginOtp(email);
     setOtpLoading(false);
+    setAuthLoading("none");
     if (resp.success) {
       setStage("otp");
     } else {
@@ -204,7 +252,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background relative flex items-center justify-center px-6 py-12">
+    <div className="min-h-screen bg-background relative flex items-center justify-center px-4 py-12">
       <div className="absolute inset-0 grid-pattern opacity-30" />
       <div className="absolute inset-0 bg-gradient-to-b from-background via-secondary/25 to-background" />
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] rounded-full bg-primary/5 blur-[140px]" />
@@ -221,7 +269,7 @@ const Login = () => {
           className="flex items-center justify-center gap-2.5 mb-6"
         >
           <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <Shield className="w-4 h-4 text-primary" />
+            <Shield className="w-4 h-4 text-primary animate-pulse" />
           </div>
           <span className="text-sm font-semibold text-foreground">Secure</span>
         </motion.div>
@@ -232,7 +280,7 @@ const Login = () => {
           transition={{ duration: 0.5, ease: "easeOut" }}
           className="relative z-10 w-full"
         >
-          <div className="bg-card/50 backdrop-blur-2xl border border-border/40 rounded-2xl p-10 shadow-2xl shadow-background/50">
+          <div className="bg-card/50 backdrop-blur-2xl border border-border/40 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-background/50">
             <AnimatePresence mode="wait">
               {/* CREDENTIALS STAGE */}
               {stage === "credentials" && (
@@ -243,19 +291,16 @@ const Login = () => {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.35 }}
                 >
-                  <div className="mb-8 text-center">
-                    <h1 className="text-2xl font-bold text-foreground mb-2">Verify Your Identity</h1>
+                  <div className="mb-6 text-center">
+                    <h1 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Verify Your Identity</h1>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      Use your Voter ID or email to continue with biometric verification or OTP.
+                      Use your matric number or email to continue with biometric verification or OTP.
                     </p>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-5">
+                  <form onSubmit={handleContinue} className="space-y-5">
                     {/* Email / Voter ID */}
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider text-center">
-                        Voter ID / Email
-                      </label>
                       <motion.div
                         animate={shakeField === "email" ? { x: [0, -4, 4, -4, 4, 0] } : {}}
                         transition={{ duration: 0.4 }}
@@ -264,12 +309,25 @@ const Login = () => {
                           <input
                             type="text"
                             value={email}
-                            onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: undefined })); }}
-                            placeholder="voterID@securevote.com"
-                            className={`w-full bg-muted/40 border rounded-xl px-4 py-3.5 text-sm text-foreground text-center placeholder:text-muted-foreground/50 placeholder:text-center outline-none transition-all duration-300 focus:scale-[1.01] focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.15)] ${errors.email ? "border-destructive/50" : "border-border/50 focus:border-primary/50"
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              setEmail(next);
+                              setErrors((p) => ({ ...p, email: undefined }));
+                              if (!next) setEmailValidity("empty");
+                              else setEmailValidity(isValidIdentifier(next) ? "valid" : "invalid");
+                            }}
+                            placeholder=" "
+                            className={`peer w-full bg-muted/40 border rounded-xl px-4 pt-6 pb-2 text-sm text-foreground placeholder-transparent outline-none transition-all duration-300 focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.15)] ${
+                              emailValidity === "invalid" || errors.email ? "border-destructive/60" : emailValidity === "valid" ? "border-emerald-500/60 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]" : "border-border/50 focus:border-primary/50"
                               }`}
                           />
+                          <label className="absolute left-4 top-2.5 text-xs text-muted-foreground transition-all duration-200 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-sm peer-focus:top-2.5 peer-focus:-translate-y-0 peer-focus:text-xs pointer-events-none">
+                            Matric Number / Email
+                          </label>
                           <Mail className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+                          {emailValidity === "valid" && (
+                            <Check className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                          )}
                         </div>
                       </motion.div>
                       {errors.email && (
@@ -284,40 +342,66 @@ const Login = () => {
                     </div>
 
                     {/* Submit */}
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-[#001F3F] text-white font-medium py-3 rounded-lg border border-white/10 shadow-sm transition-all duration-200 hover:bg-[#002b5a] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
-                    >
-                      {loading ? (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="flex items-center gap-2"
-                        >
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Authenticating…</span>
-                        </motion.div>
-                      ) : (
-                        "Continue to Biometric Verification"
-                      )}
-                    </button>
+                    {!showAuthOptions && (
+                      <button
+                        type="submit"
+                        disabled={isAnyLoading}
+                        className="w-full bg-[#1D4ED8] text-white font-semibold py-3 rounded-lg border border-white/10 shadow-sm transition-all duration-200 hover:bg-[#1E40AF] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                      >
+                        Continue
+                      </button>
+                    )}
 
-                    <button
-                      type="button"
-                      onClick={handleRequestOtpFallback}
-                      disabled={loading || otpLoading}
-                      className="w-full bg-muted/40 text-foreground font-semibold py-3.5 rounded-xl transition-all duration-300 hover:bg-muted/60 disabled:opacity-70 text-sm flex items-center justify-center gap-2"
-                    >
-                      {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                      Login with OTP
-                    </button>
+<AnimatePresence>
+  {showAuthOptions && (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.2 }}
+      className="space-y-3"
+    >
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={isAnyLoading}
+        className="relative w-full overflow-hidden bg-[#1D4ED8] text-white font-semibold py-3.5 rounded-xl border border-white/10 shadow-sm transition-all duration-300 hover:bg-[#1E40AF] disabled:opacity-60 text-sm flex items-center justify-center gap-2"
+      >
+        {isBiometricLoading && (
+          <span className="pointer-events-none absolute top-0 left-0 h-[3px] w-full overflow-hidden bg-white/10">
+            <span className="block h-full w-1/2 bg-white/80 animate-[loading-bar_1.2s_ease-in-out_infinite]" />
+          </span>
+        )}
+        {isBiometricLoading ? (
+          <span>Authenticating...</span>
+        ) : (
+          <>
+            <Fingerprint className="w-4 h-4" />
+            Continue with Biometrics
+          </>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={handleRequestOtpFallback}
+        disabled={isAnyLoading}
+        className="w-full bg-transparent border border-border/60 text-foreground font-semibold py-3.5 rounded-xl transition-all duration-300 hover:bg-muted/40 disabled:opacity-70 text-sm flex items-center justify-center gap-2"
+      >
+        {isOtpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+        {isOtpLoading ? "Sending OTP..." : "Login with OTP"}
+      </button>
+    </motion.div>
+  )}
+</AnimatePresence>
                   </form>
 
                   {/* Secondary links */}
                   <div className="mt-8 flex flex-col items-center gap-2.5">
-                    <Link href="/register" className="text-xs text-muted-foreground hover:text-foreground transition-colors relative group">
-                      Sign Up 
+                    <Link
+                      href="/register"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors relative group inline-flex items-center justify-center min-h-[44px] px-3"
+                    >
+                      Sign Up
                       <span className="absolute left-0 -bottom-0.5 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full" />
                     </Link>
                   </div>
@@ -374,7 +458,7 @@ const Login = () => {
                   <button
                     onClick={handleVerifyOtpFallback}
                     disabled={otpLoading || otp.join("").length !== 6}
-                    className="w-full gradient-cta text-primary-foreground font-semibold py-3.5 rounded-xl transition-all duration-300 disabled:opacity-70 text-sm flex items-center justify-center gap-2"
+                    className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-xl transition-all duration-300 hover:bg-primary/90 disabled:opacity-70 text-sm flex items-center justify-center gap-2"
                   >
                     {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify OTP"}
                   </button>
@@ -505,3 +589,4 @@ const Login = () => {
 };
 
 export default Login;
+
