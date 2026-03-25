@@ -37,10 +37,16 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS configuration
+const envOrigins = [process.env.CORS_ORIGIN, process.env.FRONTEND_URL]
+  .filter(Boolean)
+  .flatMap((value) => value!.split(','))
+  .map((value) => value.trim())
+  .filter(Boolean);
+
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.CORS_ORIGIN?.trim()
-].filter(Boolean) as string[];
+  ...envOrigins,
+] as string[];
 
 app.use(
   cors({
@@ -50,6 +56,7 @@ app.use(
 
       const isAllowed = allowedOrigins.includes(origin) ||
         origin.includes('ngrok-free.dev') ||
+        (process.env.ALLOW_VERCEL_PREVIEWS === 'true' && origin.endsWith('.vercel.app')) ||
         process.env.NODE_ENV === 'development'; // Be permissive in dev
 
       if (isAllowed) {
