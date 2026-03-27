@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  transpilePackages: ['@simplewebauthn/browser'],
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
   async rewrites() {

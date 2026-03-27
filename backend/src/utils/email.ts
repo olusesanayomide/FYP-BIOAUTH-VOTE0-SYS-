@@ -1,5 +1,8 @@
 import nodemailer from 'nodemailer';
 
+const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
+
 /**
  * Send OTP via Resend API if RESEND_API_KEY is provided, otherwise fall back to SMTP via nodemailer.
  */
@@ -102,6 +105,94 @@ const buildVoteConfirmationHtml = (name: string, electionTitle: string, voteCoun
   </div>
 `;
 
+const getGmailConfig = () => {
+  const clientId = process.env.GMAIL_API_CLIENT_ID?.trim();
+  const clientSecret = process.env.GMAIL_API_CLIENT_SECRET?.trim();
+  const refreshToken = process.env.GMAIL_API_REFRESH_TOKEN?.trim();
+  const sender = process.env.GMAIL_API_SENDER?.trim();
+
+  if (!clientId || !clientSecret || !refreshToken || !sender) {
+    return null;
+  }
+
+  return { clientId, clientSecret, refreshToken, sender };
+};
+
+const base64UrlEncode = (input: string) =>
+  Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+
+const sendViaGmailApi = async ({
+  to,
+  from,
+  subject,
+  html,
+}: {
+  to: string;
+  from: string;
+  subject: string;
+  html: string;
+}) => {
+  const cfg = getGmailConfig();
+  if (!cfg) {
+    throw new Error('Gmail API not configured');
+  }
+
+  const tokenRes = await fetch(GMAIL_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+      refresh_token: cfg.refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const body = await tokenRes.text();
+    throw new Error(`Gmail token error (${tokenRes.status}): ${body}`);
+  }
+
+  const tokenJson = await tokenRes.json();
+  const accessToken = tokenJson.access_token as string | undefined;
+  if (!accessToken) {
+    throw new Error('Gmail token error: missing access_token');
+  }
+
+  const rawMessage = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 7bit',
+    '',
+    html,
+  ].join('\r\n');
+
+  const res = await fetch(GMAIL_SEND_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      raw: base64UrlEncode(rawMessage),
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Gmail send error (${res.status}): ${body}`);
+  }
+
+  return { success: true };
+};
+
 
 const initializeSmtpTransporter = () => {
   const transporter = nodemailer.createTransport({
@@ -122,11 +213,26 @@ const initializeSmtpTransporter = () => {
 };
 
 export const sendOtpEmail = async (email: string, otp: string, name: string) => {
-  const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
+  const from = process.env.GMAIL_API_SENDER || process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
   const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
   const recipient = forcedRecipient || email;
   const textBody = `Hello ${name}, your one-time verification code is ${otp}. This code expires in 15 minutes.`;
   const start = Date.now();
+
+  if (getGmailConfig()) {
+    try {
+      await sendViaGmailApi({
+        to: recipient,
+        from,
+        subject: 'Your Biometric Voting Registration OTP',
+        html: buildHtml(name, otp),
+      });
+      console.log(`[EMAIL] OTP email sent via Gmail API to ${recipient} in ${Date.now() - start}ms`);
+      return { success: true };
+    } catch (err) {
+      console.error('Gmail API send failed, falling back to other providers:', err);
+    }
+  }
 
   // If RESEND_API_KEY is set, prefer Resend API
   const resendKey = process.env.RESEND_API_KEY;
@@ -191,11 +297,26 @@ export const sendOtpEmail = async (email: string, otp: string, name: string) => 
 };
 
 export const sendAdminSetupEmail = async (email: string, name: string, setupLink: string) => {
-  const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
+  const from = process.env.GMAIL_API_SENDER || process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
   const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
   const recipient = forcedRecipient || email;
   const textBody = `Hello ${name},\n\nYou have been invited to set up your Administrator account for the Secure Voting System. Please click the following link to register your biometric credentials:\n\n${setupLink}\n\nThis link expires in 24 hours.`;
   const start = Date.now();
+
+  if (getGmailConfig()) {
+    try {
+      await sendViaGmailApi({
+        to: recipient,
+        from,
+        subject: 'Admin Portal Setup Invitation',
+        html: buildAdminSetupHtml(name, setupLink),
+      });
+      console.log(`[EMAIL] Admin setup email sent via Gmail API to ${recipient} in ${Date.now() - start}ms`);
+      return { success: true };
+    } catch (err) {
+      console.error('Gmail API send failed, falling back to other providers:', err);
+    }
+  }
 
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
@@ -257,12 +378,27 @@ export const sendVoteConfirmationEmail = async (
   voteCount: number,
   recordedAt: Date,
 ) => {
-  const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
+  const from = process.env.GMAIL_API_SENDER || process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
   const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
   const recipient = forcedRecipient || email;
   const timestamp = recordedAt.toLocaleString();
   const textBody = `Hello ${name},\n\nYour ballot has been securely recorded for "${electionTitle}".\nBallots cast: ${voteCount}\nTime recorded: ${timestamp}\n\nIf you did not cast this vote, please contact the election administrator immediately.`;
   const start = Date.now();
+
+  if (getGmailConfig()) {
+    try {
+      await sendViaGmailApi({
+        to: recipient,
+        from,
+        subject: 'Your Vote Has Been Recorded',
+        html: buildVoteConfirmationHtml(name, electionTitle, voteCount, timestamp),
+      });
+      console.log(`[EMAIL] Vote confirmation email sent via Gmail API to ${recipient} in ${Date.now() - start}ms`);
+      return { success: true };
+    } catch (err) {
+      console.error('Gmail API send failed, falling back to other providers:', err);
+    }
+  }
 
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
