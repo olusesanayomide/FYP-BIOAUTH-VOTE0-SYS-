@@ -93,6 +93,8 @@ export function ResultsView() {
     ];
   }, [selectedElection]);
 
+  const getElectionById = (electionId: string) => elections.find((e) => e.id === electionId) || null;
+
   useEffect(() => {
     const loadElections = async () => {
       const resp = await getElections();
@@ -106,9 +108,12 @@ export function ResultsView() {
 
   const loadResults = async (electionId: string) => {
     if (!electionId) return;
-    if (!resultsPublished) {
+    const election = getElectionById(electionId);
+    const electionResultsPublished = Boolean(election?.results_published);
+
+    if (!electionResultsPublished) {
       setResult(null);
-      setError("Results for this election have not been officially published yet.");
+      setError("Results are awaiting official release.");
       setResultLoading(false);
       return;
     }
@@ -219,7 +224,7 @@ export function ResultsView() {
       )}
 
       {/* Ongoing State */}
-      {!resultLoading && selectedElection && phase === "ongoing" && (
+      {!resultLoading && selectedElection && phase === "ongoing" && resultsPublished && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -295,8 +300,34 @@ export function ResultsView() {
         </motion.div>
       )}
 
+      {/* Unpublished State */}
+      {!resultLoading && selectedElection && !resultsPublished && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-2xl p-6 border border-border/50 bg-background/50"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-5 w-5 text-warning" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-sm font-semibold text-foreground">Awaiting Official Release</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                This election&apos;s results are not public yet.
+              </p>
+              <p className="text-xs text-muted-foreground/80 mt-2">
+                {phase === "ongoing"
+                  ? "Voting may still be in progress, so tallies remain hidden until official release."
+                  : "Certified tallies stay hidden until an administrator publishes the official result."}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Error State */}
-      {!resultLoading && error && (
+      {!resultLoading && error && resultsPublished && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl p-6 border border-destructive/30 bg-destructive/5 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
             <AlertCircle className="h-5 w-5 text-destructive" />
@@ -438,17 +469,6 @@ export function ResultsView() {
                     )}
                   </div>
 
-                  {sortedCandidates.length > 0 && hasVotes && (
-                    <div className="mt-6">
-                      <button
-                        type="button"
-                        className="w-full h-11 rounded-xl border border-amber-300/40 bg-amber-400/10 text-amber-200 font-semibold text-sm hover:bg-amber-400/20 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <span className="inline-flex h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
-                        View Audit Log
-                      </button>
-                    </div>
-                  )}
                 </motion.div>
               );
             })}

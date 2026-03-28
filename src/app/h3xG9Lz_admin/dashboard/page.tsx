@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Fingerprint, ShieldAlert, TrendingUp, Activity, Clock, CheckCircle2,
   AlertTriangle, Ban
 } from "lucide-react";
+import Link from "next/link";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import apiClient from "@/services/api";
+import { getAuditLogs } from "@/services/adminService";
+import { AuditLogTelemetryRow, deriveSecurityTelemetry } from "@/lib/adminSecurityTelemetry";
 
 function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
   const [count, setCount] = useState(0);
@@ -34,6 +37,9 @@ const Dashboard = () => {
     recentActions: [] as any[]
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [securityLogs, setSecurityLogs] = useState<AuditLogTelemetryRow[]>([]);
+  const [isLoadingSecurity, setIsLoadingSecurity] = useState(true);
+  const [securityError, setSecurityError] = useState("");
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -51,6 +57,29 @@ const Dashboard = () => {
     };
     fetchStats();
   }, []);
+
+  useEffect(() => {
+    const fetchSecurityTelemetry = async () => {
+      setIsLoadingSecurity(true);
+      setSecurityError("");
+      try {
+        const response = await getAuditLogs();
+        if (!response.success || !response.data) {
+          setSecurityError(response.error || "Failed to load security telemetry");
+          return;
+        }
+        setSecurityLogs(response.data as AuditLogTelemetryRow[]);
+      } catch (error: any) {
+        setSecurityError(error?.message || "Failed to load security telemetry");
+      } finally {
+        setIsLoadingSecurity(false);
+      }
+    };
+
+    fetchSecurityTelemetry();
+  }, []);
+
+  const securityTelemetry = useMemo(() => deriveSecurityTelemetry(securityLogs), [securityLogs]);
 
   const statusGlow = (s: string) =>
     s === "ongoing" ? "glow-cyan" : s === "upcoming" ? "glow-amber" : "glow-emerald";
@@ -191,20 +220,55 @@ const Dashboard = () => {
           <div className="space-y-4 mt-6">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Threat Level</span>
-              <span className="text-xs font-medium tracking-wider px-2.5 py-1 rounded-full bg-success/10 text-success">LOW</span>
+              <span
+                className={`text-xs font-medium tracking-wider px-2.5 py-1 rounded-full ${
+                  isLoadingSecurity
+                    ? "bg-muted/50 text-muted-foreground"
+                    : securityTelemetry.threatLevel === "HIGH"
+                      ? "bg-destructive/10 text-destructive"
+                      : securityTelemetry.threatLevel === "MEDIUM"
+                        ? "bg-warning/10 text-warning"
+                        : "bg-success/10 text-success"
+                }`}
+              >
+                {isLoadingSecurity ? "..." : securityTelemetry.threatLevel}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Suspicious Attempts</span>
-              <span className="text-sm font-medium text-warning"><AnimatedCounter target={3} duration={800} /></span>
+              <span className="text-sm text-muted-foreground">Suspicious Attempts (24h)</span>
+              <span className="text-sm font-medium text-warning">
+                {!isLoadingSecurity ? <AnimatedCounter target={securityTelemetry.failed24h} duration={800} /> : "..."}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">IP Flagged</span>
-              <span className="text-sm font-medium text-destructive"><AnimatedCounter target={1} duration={500} /></span>
+              <span className="text-sm text-muted-foreground">Flagged IPs (7d)</span>
+              <span className="text-sm font-medium text-destructive">
+                {!isLoadingSecurity ? <AnimatedCounter target={securityTelemetry.flaggedIps} duration={500} /> : "..."}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Encryption</span>
-              <span className="text-xs text-muted-foreground">AES-256</span>
+              <span className="text-sm text-muted-foreground">Biometric Failures (7d)</span>
+              <span className="text-sm font-medium text-primary">
+                {!isLoadingSecurity ? <AnimatedCounter target={securityTelemetry.biometricFailures7d} duration={700} /> : "..."}
+              </span>
             </div>
+          </div>
+          <div className="mt-5 pt-4 border-t border-border/30 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              {securityError ? (
+                <p className="text-[11px] text-destructive truncate">{securityError}</p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  High-risk actors: {isLoadingSecurity ? "..." : securityTelemetry.highRiskUsers}
+                </p>
+              )}
+            </div>
+            <Link
+              href="/h3xG9Lz_admin/dashboard/security"
+              className="text-[11px] text-primary hover:text-primary/80 transition-colors whitespace-nowrap"
+            >
+              Open Center
+            </Link>
           </div>
         </motion.div>
 

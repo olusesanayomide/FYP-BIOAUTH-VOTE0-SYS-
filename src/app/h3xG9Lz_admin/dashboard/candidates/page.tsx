@@ -38,7 +38,7 @@ const statusCfg: Record<CandidateStatus, { label: string; color: string; bg: str
 };
 
 const babcockFaculties = [
-  "Computing and Engineering Sciences",
+  "Computing Sciences",
   "Basic Medical Sciences",
   "Law",
   "Education and Humanities",
@@ -47,7 +47,7 @@ const babcockFaculties = [
 ];
 
 const babcockDepartments: Record<string, string[]> = {
-  "Computing and Engineering Sciences": ["Software Engineering", "Computer Science", "Information Technology", "Computer Engineering"],
+  "Computing Sciences": ["Software Engineering", "Computer Science", "Information Technology", "Computer Engineering"],
   "Basic Medical Sciences": ["Anatomy", "Physiology", "Biochemistry"],
   "Law": ["Law"],
   "Education and Humanities": ["English", "History", "Education"],

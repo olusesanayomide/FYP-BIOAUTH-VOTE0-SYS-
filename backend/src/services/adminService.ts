@@ -895,13 +895,20 @@ export const deleteElection = async (id: string, adminId: string) => {
         const startTime = election.start_time ? new Date(election.start_time) : null;
         const endTime = election.end_time ? new Date(election.end_time) : null;
         const now = new Date();
-        const isOngoing =
+        const normalizedStatus = String(election.status || '').toLowerCase();
+        const isOngoingByTime =
             startTime &&
             endTime &&
             !isNaN(startTime.getTime()) &&
             !isNaN(endTime.getTime()) &&
             now >= startTime &&
             now <= endTime;
+        const isEffectivelyEnded =
+            normalizedStatus === 'completed' ||
+            normalizedStatus === 'suspended' ||
+            (endTime !== null && !isNaN(endTime.getTime()) && now >= endTime);
+
+        const isOngoing = !isEffectivelyEnded && Boolean(isOngoingByTime);
 
         if (isOngoing) {
             throw new ApiError(403, 'Cannot delete an ongoing election', 'ELECTION_ONGOING');
@@ -1091,11 +1098,44 @@ export const updateElection = async (id: string, electionData: any, adminId: str
  */
 export const updateElectionStatus = async (id: string, status: string, adminId: string) => {
     try {
+        const { data: currentElection, error: fetchError } = await supabase
+            .from('elections')
+            .select('id, title, status, start_time, end_time')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !currentElection) {
+            throw new ApiError(404, 'Election not found', 'NOT_FOUND');
+        }
+
+        const now = new Date();
+        const start = currentElection.start_time ? new Date(currentElection.start_time) : null;
+        const end = currentElection.end_time ? new Date(currentElection.end_time) : null;
+        const isOngoingByTime =
+            start &&
+            end &&
+            !isNaN(start.getTime()) &&
+            !isNaN(end.getTime()) &&
+            now >= start &&
+            now <= end;
+
+        if (status === 'completed' && !isOngoingByTime) {
+            throw new ApiError(400, 'Only an ongoing election can be ended manually', 'INVALID_STATUS_CHANGE');
+        }
+
+        const updatePayload: any = { status };
+
+        // When a super admin ends an election early, persist the close time
+        // so every status/visibility check treats it as truly ended.
+        if (status === 'completed') {
+            updatePayload.end_time = now.toISOString();
+        }
+
         const { data, error } = await supabase
             .from('elections')
-            .update({ status })
+            .update(updatePayload)
             .eq('id', id)
-            .select('id, title, status')
+            .select('id, title, status, end_time')
             .single();
 
         if (error) throw error;
@@ -1125,10 +1165,12 @@ export const updateElectionStatus = async (id: string, status: string, adminId: 
                 route: '/h3xG9Lz_admin/dashboard/elections'
             });
 
-            if (status === 'suspended' || status === 'active') {
+            if (status === 'suspended' || status === 'active' || status === 'completed') {
                 await createBroadcastForRole('voter', {
-                    title: status === 'suspended' ? 'Election suspended' : 'Election resumed',
-                    description: `"${(data as any).title}" is now ${status === 'suspended' ? 'paused' : 'active'}.`,
+                    title: status === 'suspended' ? 'Election suspended' : status === 'completed' ? 'Election ended' : 'Election resumed',
+                    description: status === 'completed'
+                        ? `"${(data as any).title}" has been ended by the super admin.`
+                        : `"${(data as any).title}" is now ${status === 'suspended' ? 'paused' : 'active'}.`,
                     type: status === 'suspended' ? 'warning' : 'info',
                     category: 'election',
                     route: '/dashboard'
@@ -1145,6 +1187,7 @@ export const updateElectionStatus = async (id: string, status: string, adminId: 
         };
     } catch (error: any) {
         console.error('Error updating election status:', error);
+        if (error instanceof ApiError) throw error;
         throw new ApiError(500, 'Failed to update election status', 'DATABASE_ERROR');
     }
 };

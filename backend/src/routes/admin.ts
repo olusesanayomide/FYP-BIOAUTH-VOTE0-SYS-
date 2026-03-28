@@ -134,6 +134,13 @@ router.put('/elections/:id', async (req: Request, res: Response, next: NextFunct
 router.patch('/elections/:id/status', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const adminId = (req as any).user.id;
+        const adminRole = (req as any).user.role;
+        if (req.body.status === 'completed' && adminRole !== 'super_admin') {
+            return res.status(403).json({
+                error: 'Only super admins can end an ongoing election',
+                code: 'SUPER_ADMIN_REQUIRED',
+            });
+        }
         const result = await updateElectionStatus(req.params.id, req.body.status, adminId);
         res.json(result);
     } catch (error) {

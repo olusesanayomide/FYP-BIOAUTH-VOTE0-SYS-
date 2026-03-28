@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Vote, Plus, Eye, Edit, PauseCircle, Archive, Activity, Clock, CheckCircle2,
-  AlertTriangle, X, Calendar, Users, Shield, Fingerprint, BarChart3, Ban, Search, PlayCircle, Trash, Download, FileText, FileCode
+  AlertTriangle, X, Calendar, Users, Shield, Fingerprint, BarChart3, Ban, Search, PlayCircle, Trash, Download, FileText, FileCode, MoreHorizontal
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import apiClient from "@/services/api";
@@ -44,7 +44,7 @@ const statusConfig: Record<ElectionStatus, { label: string; color: string; bg: s
 
 // Babcock University Data structure
 const babcockFaculties = [
-  "Computing and Engineering Sciences",
+  "Computing Sciences",
   "Basic Medical Sciences",
   "Law",
   "Education and Humanities",
@@ -53,7 +53,7 @@ const babcockFaculties = [
 ];
 
 const babcockDepartments: Record<string, string[]> = {
-  "Computing and Engineering Sciences": ["Software Engineering", "Computer Science", "Information Technology", "Computer Engineering"],
+  "Computing Sciences": ["Software Engineering", "Computer Science", "Information Technology", "Computer Technology"],
   "Basic Medical Sciences": ["Anatomy", "Physiology", "Biochemistry"],
   "Law": ["Law"],
   "Education and Humanities": ["English", "History", "Education"],
@@ -62,12 +62,15 @@ const babcockDepartments: Record<string, string[]> = {
 };
 
 const Elections = () => {
+  const actionMenuRef = useRef<HTMLDivElement | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<ViewMode>("list");
   const [elections, setElections] = useState<Election[]>([]);
   const [isLoadingElections, setIsLoadingElections] = useState(true);
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [showSuspendConfirm, setShowSuspendConfirm] = useState<string | null>(null);
+  const [showEndConfirm, setShowEndConfirm] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -76,12 +79,42 @@ const Elections = () => {
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  const [openActionMenuAbove, setOpenActionMenuAbove] = useState(false);
 
   // Fetch elections on mount
   useEffect(() => {
     setIsSuperAdmin(isStoredSuperAdmin());
     fetchElections();
   }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      if (openActionMenuId && actionMenuRef.current && !actionMenuRef.current.contains(target)) {
+        setOpenActionMenuId(null);
+        setOpenActionMenuAbove(false);
+      }
+
+      if (showExportOptions && exportMenuRef.current && !exportMenuRef.current.contains(target)) {
+        setShowExportOptions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [openActionMenuId, showExportOptions]);
+
+  useEffect(() => {
+    if (!feedbackMessage) return;
+
+    const timer = window.setTimeout(() => {
+      setFeedbackMessage(null);
+    }, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [feedbackMessage]);
 
   const fetchElections = async () => {
     setIsLoadingElections(true);
@@ -98,13 +131,15 @@ const Elections = () => {
           if (dbElection.type === "Faculty") scopeStr = dbElection.scope_faculty || "Faculty";
           if (dbElection.type === "Departmental") scopeStr = dbElection.scope_department || "Department";
 
-          // Determine status based on dates if 'status' is draft/upcoming/ongoing etc
+          // Respect explicit backend status first, then fall back to date-based derivation.
           let mappedStatus: ElectionStatus = "upcoming";
           const now = new Date();
           const start = new Date(dbElection.start_time);
           const end = new Date(dbElection.end_time);
 
           if (dbElection.status === "suspended") mappedStatus = "suspended";
+          else if (dbElection.status === "completed") mappedStatus = "completed";
+          else if (dbElection.status === "ongoing" || dbElection.status === "active") mappedStatus = "ongoing";
           else if (now > end) mappedStatus = "completed";
           else if (now >= start && now <= end) mappedStatus = "ongoing";
 
@@ -244,20 +279,62 @@ const Elections = () => {
     setView("detail");
   };
 
+  const toggleActionMenu = (electionId: string, trigger: HTMLButtonElement) => {
+    if (openActionMenuId === electionId) {
+      setOpenActionMenuId(null);
+      setOpenActionMenuAbove(false);
+      return;
+    }
+
+    const rect = trigger.getBoundingClientRect();
+    const estimatedMenuHeight = 260;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openAbove = spaceBelow < estimatedMenuHeight && rect.top > estimatedMenuHeight;
+    setOpenActionMenuAbove(openAbove);
+    setOpenActionMenuId(electionId);
+  };
+
   const handleSuspend = async () => {
     if (!showSuspendConfirm) return;
     try {
       await apiClient.patch(`/admin/elections/${showSuspendConfirm}/status`, { status: "suspended" });
       setShowSuspendConfirm(null);
+      setOpenActionMenuId(null);
+      setOpenActionMenuAbove(false);
       fetchElections(); // Refresh list to get new status
     } catch (error) {
       console.error("Failed to suspend election", error);
     }
   };
 
+  const handleEndElection = async () => {
+    if (!showEndConfirm || !isSuperAdmin) return;
+    try {
+      const response = await apiClient.patch(`/admin/elections/${showEndConfirm}/status`, { status: "completed" });
+      if (!response.data?.success) {
+        throw new Error(response.data?.error || response.data?.message || "Failed to end election");
+      }
+      setFeedbackMessage({ text: "Election ended successfully", type: "success" });
+      setShowEndConfirm(null);
+      setOpenActionMenuId(null);
+      setOpenActionMenuAbove(false);
+      fetchElections();
+      setSelectedElection((prev) =>
+        prev?.id === showEndConfirm
+          ? { ...prev, status: "completed", rawEndDate: new Date().toISOString(), endDate: new Date().toLocaleString() }
+          : prev,
+      );
+    } catch (error) {
+      console.error("Failed to end election", error);
+      setFeedbackMessage({ text: "Failed to end election", type: "error" });
+    }
+  };
+
   const handleUnsuspend = async (id: string) => {
     try {
       await apiClient.patch(`/admin/elections/${id}/status`, { status: "active" });
+      setOpenActionMenuId(null);
+      setOpenActionMenuAbove(false);
       fetchElections();
     } catch (error) {
       console.error("Failed to unsuspend election", error);
@@ -266,6 +343,8 @@ const Elections = () => {
 
   const handleDelete = async (id: string, name: string) => {
     if (!isSuperAdmin) return;
+    setOpenActionMenuId(null);
+    setOpenActionMenuAbove(false);
     setDeleteTarget({ id, name });
     setShowDeleteConfirm(true);
   };
@@ -276,6 +355,12 @@ const Elections = () => {
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
     const now = new Date();
     return now >= start && now <= end;
+  };
+
+  const isElectionCurrentlyOngoing = (election: Election) => {
+    if (election.status === "completed" || election.status === "suspended") return false;
+    if (election.status === "ongoing") return true;
+    return isElectionOngoingByTime(election.rawStartDate, election.rawEndDate);
   };
 
   const handleResultsPublish = async (id: string, publish: boolean) => {
@@ -296,13 +381,17 @@ const Elections = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await apiClient.delete(`/admin/elections/${deleteTarget.id}`);
+      const response = await apiClient.delete(`/admin/elections/${deleteTarget.id}`);
+      if (!response.data?.success) {
+        throw new Error(response.data?.error || response.data?.message || "Failed to delete election");
+      }
       fetchElections();
       setShowDeleteConfirm(false);
       setDeleteTarget(null);
-    } catch (error) {
+      setFeedbackMessage({ text: "Election deleted successfully", type: "success" });
+    } catch (error: any) {
       console.error(error);
-      setFeedbackMessage({ text: "Failed to delete election", type: "error" });
+      setFeedbackMessage({ text: error?.response?.data?.error || error?.message || "Failed to delete election", type: "error" });
     }
   };
 
@@ -366,15 +455,30 @@ const Elections = () => {
 
   return (
     <DashboardLayout breadcrumb={["Elections"]}>
+      <AnimatePresence>
+        {feedbackMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -16, scale: 0.98 }}
+            className="fixed top-24 right-4 sm:right-6 z-[140] max-w-sm w-[calc(100vw-2rem)] sm:w-full"
+          >
+            <div
+              className={`rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-sm text-sm ${
+                feedbackMessage.type === "success"
+                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                  : "border-destructive/25 bg-destructive/10 text-destructive"
+              }`}
+            >
+              {feedbackMessage.text}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence mode="wait">
         {/* â”€â”€â”€â”€â”€ LIST VIEW â”€â”€â”€â”€â”€ */}
         {view === "list" && (
           <motion.div key="list" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
-            {feedbackMessage && (
-              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${feedbackMessage.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-destructive/20 bg-destructive/5 text-destructive"}`}>
-                {feedbackMessage.text}
-              </div>
-            )}
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -440,7 +544,7 @@ const Elections = () => {
                   ).map((el, i) => {
                     const cfg = statusConfig[el.status];
                     const progress = el.registeredVoters > 0 ? Math.round((el.votesCast / el.registeredVoters) * 100) : 0;
-                    const ongoingByTime = isElectionOngoingByTime(el.startDate, el.endDate);
+                    const isCurrentlyOngoing = isElectionCurrentlyOngoing(el);
                     return (
                       <motion.div
                         key={el.id}
@@ -482,42 +586,73 @@ const Elections = () => {
                           <button onClick={() => openDetail(el)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-primary bg-primary/5 hover:bg-primary/10 transition-all">
                             <Eye className="w-3 h-3" /> View
                           </button>
-                          {el.status !== "completed" && (
-                            <button onClick={() => openEdit(el)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all">
-                              <Edit className="w-3 h-3" /> Edit
-                            </button>
-                          )}
-                          {el.status === "ongoing" && (
-                            <button onClick={() => setShowSuspendConfirm(el.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-warning hover:bg-warning/10 transition-all">
-                              <PauseCircle className="w-3 h-3" /> Suspend
-                            </button>
-                          )}
-                          {el.status === "completed" && (
-                            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-muted/30 transition-all">
-                              <Archive className="w-3 h-3" /> Archive
-                            </button>
-                          )}
-                          {el.status === "suspended" && (
-                            <button onClick={() => handleUnsuspend(el.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-success hover:bg-success/10 transition-all">
-                              <PlayCircle className="w-3 h-3" /> Resume
-                            </button>
-                          )}
-                          {isSuperAdmin && (
+                          <div className="relative ml-auto" ref={openActionMenuId === el.id ? actionMenuRef : null}>
                             <button
-                              onClick={() => {
-                                if (ongoingByTime) return;
-                                handleDelete(el.id, el.name);
-                              }}
-                              disabled={ongoingByTime}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all ml-auto ${ongoingByTime
-                                ? "text-muted-foreground/50 cursor-not-allowed"
-                                : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                }`}
-                              title={ongoingByTime ? "Cannot delete an ongoing election" : "Delete Election"}
+                              onClick={(event) => toggleActionMenu(el.id, event.currentTarget)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
+                              aria-label={`Open actions for ${el.name}`}
                             >
-                              <Trash className="w-3 h-3" /> Delete
+                              <MoreHorizontal className="w-4 h-4" />
                             </button>
-                          )}
+
+                            <AnimatePresence>
+                              {openActionMenuId === el.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: openActionMenuAbove ? -8 : 8, scale: 0.98 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: openActionMenuAbove ? -8 : 8, scale: 0.98 }}
+                                  className={`absolute right-0 w-48 admin-card rounded-xl border border-border/40 shadow-xl z-[70] overflow-hidden ${
+                                    openActionMenuAbove ? "bottom-full mb-2" : "top-full mt-2"
+                                  }`}
+                                >
+                                  {el.status !== "completed" && (
+                                    <button onClick={() => { openEdit(el); setOpenActionMenuId(null); setOpenActionMenuAbove(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-primary/5 transition-colors border-b border-border/10">
+                                      <Edit className="w-4 h-4" />
+                                      <span>Edit</span>
+                                    </button>
+                                  )}
+                                  {el.status === "ongoing" && (
+                                    <button onClick={() => { setShowSuspendConfirm(el.id); setOpenActionMenuId(null); setOpenActionMenuAbove(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-warning hover:bg-warning/5 transition-colors border-b border-border/10">
+                                      <PauseCircle className="w-4 h-4" />
+                                      <span>Suspend</span>
+                                    </button>
+                                  )}
+                                  {isSuperAdmin && el.status === "ongoing" && (
+                                    <button onClick={() => { setShowEndConfirm(el.id); setOpenActionMenuId(null); setOpenActionMenuAbove(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/5 transition-colors border-b border-border/10">
+                                      <Ban className="w-4 h-4" />
+                                      <span>End Election</span>
+                                    </button>
+                                  )}
+                                  {el.status === "suspended" && (
+                                    <button onClick={() => handleUnsuspend(el.id)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-success hover:bg-success/5 transition-colors border-b border-border/10">
+                                      <PlayCircle className="w-4 h-4" />
+                                      <span>Resume</span>
+                                    </button>
+                                  )}
+                                  {el.status === "completed" && (
+                                    <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground hover:bg-muted/20 transition-colors border-b border-border/10">
+                                      <Archive className="w-4 h-4" />
+                                      <span>Archive</span>
+                                    </button>
+                                  )}
+                                  {isSuperAdmin && (
+                                    <button
+                                      onClick={() => {
+                                        if (isCurrentlyOngoing) return;
+                                        handleDelete(el.id, el.name);
+                                      }}
+                                      disabled={isCurrentlyOngoing}
+                                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/5 transition-colors disabled:opacity-50"
+                                      title={isCurrentlyOngoing ? "Cannot delete an ongoing election" : "Delete Election"}
+                                    >
+                                      <Trash className="w-4 h-4" />
+                                      <span>Delete</span>
+                                    </button>
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
                       </motion.div>
                     );
@@ -539,6 +674,24 @@ const Elections = () => {
                     <div className="flex gap-3 justify-end">
                       <button onClick={() => setShowSuspendConfirm(null)} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all">Cancel</button>
                       <button onClick={handleSuspend} className="px-4 py-2 rounded-lg text-sm font-medium bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20 transition-all">Suspend Election</button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {showEndConfirm && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                  <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="admin-card rounded-2xl p-8 max-w-md w-full mx-4 border border-destructive/20">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Ban className="w-5 h-5 text-destructive" />
+                      <h3 className="text-lg font-semibold text-foreground">End Election</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-6">This will immediately end the ongoing election and stop all further voting. Only a super admin can perform this action.</p>
+                    <div className="flex gap-3 justify-end">
+                      <button onClick={() => setShowEndConfirm(null)} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all">Cancel</button>
+                      <button onClick={handleEndElection} className="px-4 py-2 rounded-lg text-sm font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all">End Election</button>
                     </div>
                   </motion.div>
                 </motion.div>
@@ -723,11 +876,6 @@ const Elections = () => {
         {/* â”€â”€â”€â”€â”€ DETAIL VIEW â”€â”€â”€â”€â”€ */}
         {view === "detail" && selectedElection && (
           <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
-            {feedbackMessage && (
-              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${feedbackMessage.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-destructive/20 bg-destructive/5 text-destructive"}`}>
-                {feedbackMessage.text}
-              </div>
-            )}
             {(() => {
               const end = new Date(selectedElection.rawEndDate);
               const canPublishResults = !isNaN(end.getTime()) && new Date() > end;
@@ -747,12 +895,17 @@ const Elections = () => {
                     <PauseCircle className="w-4 h-4" /> Suspend
                   </button>
                 )}
+                {isSuperAdmin && selectedElection.status === "ongoing" && (
+                  <button onClick={() => setShowEndConfirm(selectedElection.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-destructive bg-destructive/5 hover:bg-destructive/10 border border-destructive/20 transition-all">
+                    <Ban className="w-4 h-4" /> End Election
+                  </button>
+                )}
                 {!isSuperAdmin && (
                   <div className="px-3 py-2 rounded-lg text-xs text-muted-foreground border border-border/30 bg-muted/15">
-                    Delete controls are reserved for super admins.
+                    Only super admins can end or delete an election. Admins can suspend only.
                   </div>
                 )}
-                <div className="relative">
+                <div className="relative" ref={showExportOptions ? exportMenuRef : null}>
                   <button
                     onClick={() => setShowExportOptions(!showExportOptions)}
                     disabled={isExporting !== null}
