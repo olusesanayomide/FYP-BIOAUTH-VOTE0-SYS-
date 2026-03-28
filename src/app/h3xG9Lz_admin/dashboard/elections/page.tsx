@@ -381,12 +381,12 @@ const Elections = () => {
             </div>
 
             {/* Status summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="flex overflow-x-auto md:grid md:grid-cols-4 gap-4 mb-8 pb-2 snap-x hide-scrollbar">
               {(["ongoing", "upcoming", "completed", "suspended"] as ElectionStatus[]).map((s) => {
                 const cfg = statusConfig[s];
                 const count = elections.filter((e) => e.status === s).length;
                 return (
-                  <motion.div key={s} className={`admin-card rounded-xl p-4 border ${cfg.border}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                  <motion.div key={s} className={`admin-card rounded-xl p-4 border ${cfg.border} min-w-[140px] md:min-w-0 snap-start flex-shrink-0`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                     <div className="flex items-center justify-between">
                       <span className={`text-2xl font-semibold ${cfg.color}`}>{count}</span>
                       <cfg.icon className={`w-4 h-4 ${cfg.color}`} />

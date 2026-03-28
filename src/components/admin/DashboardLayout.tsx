@@ -237,6 +237,13 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
           })}
         </nav>
 
+        {/* Mobile Sidebar Footer for Theme Toggle */}
+        <div className="md:hidden border-t border-border/30 p-4 shrink-0">
+          <div className="flex items-center justify-between px-2">
+            <span className="text-sm font-medium text-muted-foreground">Appearance</span>
+            <ThemeToggle />
+          </div>
+        </div>
       </aside>
 
       {/* Main content */}
@@ -268,11 +275,13 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <ThemeToggle />
+            <div className="hidden md:block">
+              <ThemeToggle />
+            </div>
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="w-8 h-8 rounded-lg border border-transparent flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50 transition-all duration-300"
-              title="Search (Ctrl/Cmd + K)"
+              className="md:hidden flex w-8 h-8 rounded-lg border border-transparent items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50 transition-all duration-300"
+              title="Search"
             >
               <Search className="w-4 h-4" />
             </button>

@@ -76,28 +76,28 @@ const Dashboard = () => {
           <div className="absolute -inset-full h-full w-1/3 animate-light-sweep" style={{ background: "linear-gradient(90deg, transparent, hsla(187, 100%, 50%, 0.02), transparent)" }} />
         </div>
         <div className="absolute top-0 left-8 right-8 h-px" style={{ background: "linear-gradient(90deg, transparent, hsla(187, 100%, 50%, 0.1), transparent)" }} />
-        <motion.h2 className="text-2xl font-semibold text-foreground tracking-tight mb-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+        <motion.h2 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight mb-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
           Command Center Overview
         </motion.h2>
-        <motion.p className="text-sm text-muted-foreground max-w-xl" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+        <motion.p className="text-xs sm:text-sm text-muted-foreground max-w-xl" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
           Monitor biometric authentication, election activity, and system integrity in real time.
         </motion.p>
-        <div className="flex items-center gap-6 mt-6">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-6 sm:gap-6 mt-6 sm:mt-8">
           <div className="text-center">
             <p className="text-2xl font-semibold text-primary">
               {!isLoadingStats ? <AnimatedCounter target={stats.adminsOnline} duration={800} /> : "-"}
             </p>
-            <p className="admin-kpi mt-1">ADMINS ONLINE (15m)</p>
+            <p className="admin-kpi mt-1">ADMINS (15m)</p>
           </div>
-          <div className="w-px h-10 bg-border/30" />
+          <div className="hidden sm:block w-px h-10 bg-border/30" />
           <div className="text-center">
             <p className="text-2xl font-semibold text-foreground">
               {!isLoadingStats ? <AnimatedCounter target={stats.totalVoters} /> : "-"}
             </p>
             <p className="admin-kpi mt-1">TOTAL VOTERS</p>
           </div>
-          <div className="w-px h-10 bg-border/30" />
-          <div className="text-center">
+          <div className="hidden sm:block w-px h-10 bg-border/30" />
+          <div className="text-center col-span-2 sm:col-span-1">
             <p className="text-2xl font-semibold text-success">
               {!isLoadingStats ? <AnimatedCounter target={stats.verifiedBio} /> : "-"}
             </p>
@@ -108,8 +108,8 @@ const Dashboard = () => {
 
       {/* Election cards */}
       <div>
-        <h3 className="admin-section-title mb-4 mt-8">Election Status</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <h3 className="admin-section-title mb-4 mt-8 sm:mt-10">Election Status</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {stats.elections?.length > 0 ? stats.elections.map((el, i) => (
             <motion.div
               key={i}
@@ -129,10 +129,10 @@ const Dashboard = () => {
                 {el.status === "upcoming" && <Clock className="w-4 h-4 text-warning" />}
                 {el.status === "completed" && <CheckCircle2 className="w-4 h-4 text-success" />}
               </div>
-              <h4 className="text-sm font-medium text-foreground mb-3 truncate">{el.name}</h4>
-              <div className="space-y-1.5 text-xs text-muted-foreground mb-4">
-                <p>Start: {el.start} • End: {el.end}</p>
-                <p>Available Voters: <span className="text-foreground">{el.voters}</span> • Actual Votes: <span className="text-foreground">{el.verified}</span></p>
+              <h4 className="text-sm font-medium text-foreground mb-3 truncate" title={el.name}>{el.name}</h4>
+              <div className="space-y-2 text-[10px] sm:text-xs text-muted-foreground/80 mb-4">
+                <p className="truncate">Start: {el.start} <br className="sm:hidden" />• End: {el.end}</p>
+                <p>Voters: <span className="text-foreground">{el.voters}</span> • Votes: <span className="text-foreground">{el.verified}</span></p>
               </div>
               <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
                 <motion.div
@@ -152,15 +152,15 @@ const Dashboard = () => {
       </div>
 
       {/* Bottom grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 lg:mt-6">
         {/* Biometric module */}
         <motion.div className="admin-card rounded-xl p-6 lg:col-span-1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
           <div className="flex items-center gap-2 mb-4">
             <Fingerprint className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-medium text-foreground">Biometric Verification Stream</h3>
           </div>
-          <div className="relative w-20 h-20 mx-auto my-6">
-            <Fingerprint className="w-20 h-20 text-primary/20" />
+          <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto my-4 sm:my-6">
+            <Fingerprint className="w-16 h-16 sm:w-20 sm:h-20 text-primary/20 transition-all" />
             <motion.div
               className="absolute inset-0 flex items-center"
               style={{ background: "linear-gradient(transparent 40%, hsla(187, 100%, 50%, 0.15) 50%, transparent 60%)" }}
@@ -215,18 +215,20 @@ const Dashboard = () => {
             <h3 className="text-sm font-medium text-foreground">Recent Admin Actions</h3>
           </div>
           <div className="relative space-y-0 mt-4">
-            <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border/30" />
+            <div className="absolute left-[6px] top-3 bottom-2 w-[2px] bg-border/30 rounded-full" />
             {stats.recentActions?.length > 0 ? stats.recentActions.map((action, i) => (
               <motion.div
                 key={i}
-                className="flex items-start gap-4 py-2.5 relative"
+                className="flex items-start gap-4 py-3 relative"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 1 + i * 0.1 }}
               >
-                <div className="w-3.5 h-3.5 rounded-full border-2 border-primary/40 bg-background flex-shrink-0 mt-0.5 relative z-10" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-foreground/80 truncate">{action.text}</p>
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-primary/40 bg-background flex-shrink-0 mt-1 relative z-10" />
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <p className="text-xs text-foreground/90 truncate font-medium" title={action.text}>
+                    {action.text.includes('-') ? action.text.split('-')[0].trim() : action.text}
+                  </p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">{action.time}</p>
                 </div>
               </motion.div>
@@ -241,4 +243,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
