@@ -105,6 +105,42 @@ const buildVoteConfirmationHtml = (name: string, electionTitle: string, voteCoun
   </div>
 `;
 
+const buildElectionResultsHtml = (name: string, electionTitle: string, dashboardUrl: string) => `
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px; text-align: center; border-radius: 8px 8px 0 0;">
+      <h1 style="color: white; margin: 0; font-size: 28px;">Election Results Published</h1>
+    </div>
+    
+    <div style="padding: 40px; background: #f9fafb; border-radius: 0 0 8px 8px;">
+      <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Hello ${name},</p>
+      
+      <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+        The electoral committee has officially published the results for the following election:
+      </p>
+
+      <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 18px; margin-bottom: 24px; text-align: center;">
+        <p style="margin: 0; color: #111827; font-weight: 700; font-size: 18px;">${electionTitle}</p>
+      </div>
+      
+      <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
+        You can now view the final ballot counts, winners, and analytics directly from your voter dashboard.
+      </p>
+
+      <div style="text-align: center; margin-bottom: 30px;">
+        <a href="${dashboardUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+          View Election Results
+        </a>
+      </div>
+      
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+      
+      <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+        This is an automated message. Please do not reply to this email.
+      </p>
+    </div>
+  </div>
+`;
+
 const getGmailConfig = () => {
   const clientId = process.env.GMAIL_API_CLIENT_ID?.trim();
   const clientSecret = process.env.GMAIL_API_CLIENT_SECRET?.trim();
@@ -449,5 +485,79 @@ export const sendVoteConfirmationEmail = async (
   } catch (error) {
     console.error('Failed to send vote confirmation email via SMTP:', error);
     throw new Error('Failed to send vote confirmation email');
+  }
+};
+
+export const sendElectionResultsEmail = async (
+  email: string,
+  name: string,
+  electionTitle: string,
+  dashboardUrl: string,
+) => {
+  const from = process.env.GMAIL_API_SENDER || process.env.RESEND_FROM || process.env.SMTP_FROM || 'noreply@securevote.edu';
+  const forcedRecipient = process.env.OTP_TEST_RECIPIENT?.trim();
+  const recipient = forcedRecipient || email;
+  const textBody = `Hello ${name},\n\nThe electoral committee has officially published the results for: "${electionTitle}".\nYou can view the final ballot counts and winners directly from your voter dashboard:\n${dashboardUrl}\n\nIf you have any questions, please contact the election administrator.`;
+  const start = Date.now();
+
+  if (getGmailConfig()) {
+    try {
+      await sendViaGmailApi({
+        to: recipient,
+        from,
+        subject: `Results Published for ${electionTitle}`,
+        html: buildElectionResultsHtml(name, electionTitle, dashboardUrl),
+      });
+      console.log(`[EMAIL] Election results email sent via Gmail API to ${recipient} in ${Date.now() - start}ms`);
+      return { success: true };
+    } catch (err) {
+      console.error('Gmail API send failed, falling back:', err);
+    }
+  }
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    try {
+      const payload = {
+        from,
+        to: recipient,
+        subject: `Results Published for ${electionTitle}`,
+        html: buildElectionResultsHtml(name, electionTitle, dashboardUrl),
+      };
+
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${resendKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Failed to send results email via Resend');
+      return { success: true };
+    } catch (err) {
+      console.error('Resend send failed, falling back to SMTP:', err);
+    }
+  }
+
+  try {
+    const transporter = initializeSmtpTransporter();
+    if (process.env.NODE_ENV !== 'production') await transporter.verify();
+
+    await transporter.sendMail({
+      from,
+      to: recipient,
+      subject: `Results Published for ${electionTitle}`,
+      html: buildElectionResultsHtml(name, electionTitle, dashboardUrl),
+      text: textBody,
+      replyTo: from,
+    });
+
+    console.log(`[EMAIL] Results email accepted by SMTP server for recipient: ${recipient} in ${Date.now() - start}ms`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send results email via SMTP:', error);
+    throw new Error('Failed to send results email');
   }
 };

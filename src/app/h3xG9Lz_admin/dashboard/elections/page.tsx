@@ -165,7 +165,7 @@ const Elections = () => {
   const [formData, setFormData] = useState({
     name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "",
     startDate: "", endDate: "",
-    biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "",
+    biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", positions: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -198,6 +198,7 @@ const Elections = () => {
       }
       const payload = {
         ...formData,
+        positions: formData.positions ? formData.positions.split(',').map(s => s.trim()).filter(Boolean) : [],
         startDate: new Date(formData.startDate).toISOString(),
         endDate: new Date(formData.endDate).toISOString(),
         votingMethod: "Single Choice",
@@ -216,7 +217,7 @@ const Elections = () => {
       setFormData({
         name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "",
         startDate: "", endDate: "",
-        biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "",
+        biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", positions: "",
       });
       setEditingId(null);
       // Re-fetch to update list
@@ -300,8 +301,8 @@ const Elections = () => {
     }
   };
 
-  const openEdit = (el: Election) => {
-    // Map back to form structure (Note: Dates may need formatting to fit datetime-local, but for simple MVP this is enough)
+  const openEdit = async (el: Election) => {
+    // Map back to form structure
     const toDateTimeLocal = (dateString: string) => {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return "";
@@ -309,13 +310,23 @@ const Elections = () => {
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
+    let posString = "";
+    try {
+      const res = await apiClient.get(`/admin/elections/${el.id}/positions`);
+      if (res.data.success && res.data.positions) {
+        posString = res.data.positions.join(", ");
+      }
+    } catch(err) {
+      console.error(err);
+    }
+
     setFormData({
       name: el.name, description: el.description, type: el.type,
       scopeFaculty: el.type !== "Presidential" ? el.scope : "",
       scopeDepartment: el.type === "Departmental" ? el.scope : "",
       scopeLevel: "",
       startDate: toDateTimeLocal(el.startDate), endDate: toDateTimeLocal(el.endDate),
-      biometricEnforced: el.biometricEnforced, realTimeMonitoring: el.realTimeMonitoring, eligibilityRules: el.eligibilityRules,
+      biometricEnforced: el.biometricEnforced, realTimeMonitoring: el.realTimeMonitoring, eligibilityRules: el.eligibilityRules, positions: posString,
     });
     setEditingId(el.id);
     setView("create");
@@ -554,7 +565,7 @@ const Elections = () => {
                 {editingId ? <Edit className="w-5 h-5 text-primary" /> : <Plus className="w-5 h-5 text-primary" />}
                 <h2 className="text-xl font-semibold text-foreground">{editingId ? "Edit Election" : "Create New Election"}</h2>
               </div>
-              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} className="text-muted-foreground hover:text-foreground transition-colors">
+              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", positions: "", }); }} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -654,6 +665,12 @@ const Elections = () => {
                   <input value={formData.eligibilityRules} onChange={(e) => setFormData({ ...formData, eligibilityRules: e.target.value })} placeholder="e.g. Only 300 Level Students"
                     className="admin-input h-12 px-4 text-sm placeholder:text-muted-foreground/60" />
                 </div>
+                {/* Positions */}
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Available Positions</label>
+                  <input value={formData.positions} onChange={(e) => setFormData({ ...formData, positions: e.target.value })} placeholder="Comma-separated (e.g. President, Vice President, Secretary)"
+                    className="admin-input h-12 px-4 text-sm placeholder:text-muted-foreground/60" />
+                </div>
                 {/* Toggles */}
                 <div className="md:col-span-2 flex flex-wrap gap-6">
                   <label className="flex items-center gap-3 cursor-pointer">
@@ -682,7 +699,7 @@ const Elections = () => {
             )}
 
             <div className="flex gap-3 mt-8 pt-6 border-t border-border/20">
-              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", }); }} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
+              <button onClick={() => { setView("list"); setEditingId(null); setFormData({ name: "", description: "", type: "Presidential", scopeFaculty: "", scopeDepartment: "", scopeLevel: "", startDate: "", endDate: "", biometricEnforced: true, realTimeMonitoring: true, eligibilityRules: "", positions: "", }); }} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-50">Cancel</button>
               <button onClick={handleCreateSubmit} disabled={isSubmitting || !!dateValidationError}
                 className="admin-btn-primary px-6 py-2.5 text-sm font-medium transition-all duration-300 hover:scale-[1.01] flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
                 {isSubmitting ? "Saving..." : (editingId ? "Update Election" : "Create Election")}

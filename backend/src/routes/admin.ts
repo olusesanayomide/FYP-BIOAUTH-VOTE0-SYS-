@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { getDashboardStats, createElection, getAllElections, getAllCandidates, createCandidate, updateCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs, exportElectionResults } from '../services/adminService';
+import { getDashboardStats, createElection, getAllElections, getElectionPositions, getAllCandidates, createCandidate, updateCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs, exportElectionResults } from '../services/adminService';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -91,6 +91,20 @@ router.get('/elections', async (req: Request, res: Response, next: NextFunction)
 router.get('/elections/:id/analytics', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const result = await getElectionAnalytics(req.params.id);
+        res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * @route   GET /admin/elections/:id/positions
+ * @desc    Get available positions for an election
+ * @access  Private (Admin only)
+ */
+router.get('/elections/:id/positions', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const result = await getElectionPositions(req.params.id);
         res.json(result);
     } catch (error) {
         next(error);

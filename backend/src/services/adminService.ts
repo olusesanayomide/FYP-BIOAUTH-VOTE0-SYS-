@@ -6,6 +6,7 @@ import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import PDFDocument from 'pdfkit';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, VerticalAlign, BorderStyle } from 'docx';
+import { sendElectionResultsEmail } from '../utils/email';
 
 /**
  * Retrieves high-level dashboard metrics for the Admin Command Center
@@ -122,7 +123,7 @@ export const createElection = async (electionData: any, adminId: string) => {
         const {
             name, description, type, scopeFaculty, scopeDepartment, scopeLevel,
             startDate, endDate, votingMethod, maxVotes, biometricEnforced, realTimeMonitoring,
-            eligibilityRules
+            eligibilityRules, positions
         } = electionData;
 
         if (!name || !startDate || !endDate) {
@@ -178,6 +179,18 @@ export const createElection = async (electionData: any, adminId: string) => {
         }
 
         if (error) throw error;
+
+        // Insert explicitly defined positions
+        if (Array.isArray(positions) && positions.length > 0) {
+            const positionRecords = positions.map(pos => ({
+                election_id: data.id,
+                name: String(pos).trim()
+            })).filter(pos => pos.name.length > 0);
+
+            if (positionRecords.length > 0) {
+                await supabase.from('positions').insert(positionRecords);
+            }
+        }
 
         // Log audit action
         await supabase.from('audit_logs').insert({
@@ -298,6 +311,28 @@ export const getAllElections = async () => {
     } catch (error: any) {
         console.error('Error fetching elections:', error);
         throw new ApiError(500, 'Failed to retrieve elections', 'DATABASE_ERROR');
+    }
+};
+
+/**
+ * Retrieves positions for a specific election
+ */
+export const getElectionPositions = async (id: string) => {
+    try {
+        const { data, error } = await supabase
+            .from('positions')
+            .select('name')
+            .eq('election_id', id);
+
+        if (error) throw error;
+
+        return {
+            success: true,
+            positions: (data || []).map((p: any) => p.name)
+        };
+    } catch (error: any) {
+        console.error('Error fetching positions:', error);
+        throw new ApiError(500, 'Failed to retrieve positions', 'DATABASE_ERROR');
     }
 };
 
@@ -947,7 +982,7 @@ export const updateElection = async (id: string, electionData: any, adminId: str
         const {
             name, description, type, scopeFaculty, scopeDepartment, scopeLevel,
             startDate, endDate, votingMethod, maxVotes, biometricEnforced, realTimeMonitoring,
-            eligibilityRules
+            eligibilityRules, positions
         } = electionData;
 
         if (!name || !startDate || !endDate) {
@@ -1004,6 +1039,28 @@ export const updateElection = async (id: string, electionData: any, adminId: str
         }
 
         if (error) throw error;
+
+        // Sync explicitly defined positions
+        if (Array.isArray(positions) && positions.length > 0) {
+            const positionRecords = positions.map(pos => ({
+                election_id: id,
+                name: String(pos).trim()
+            })).filter(pos => pos.name.length > 0);
+
+            if (positionRecords.length > 0) {
+                const { data: existingPos } = await supabase
+                    .from('positions')
+                    .select('name')
+                    .eq('election_id', id);
+                
+                const existingNames = new Set((existingPos || []).map(p => p.name));
+                const newRecords = positionRecords.filter(p => !existingNames.has(p.name));
+                
+                if (newRecords.length > 0) {
+                    await supabase.from('positions').insert(newRecords);
+                }
+            }
+        }
 
         // Log audit action
         await supabase.from('audit_logs').insert({
@@ -1099,7 +1156,7 @@ export const updateElectionResultsVisibility = async (id: string, publish: boole
     try {
         const { data: election, error: electionError } = await supabase
             .from('elections')
-            .select('id, title, end_time')
+            .select('id, title, end_time, type, scope_faculty, scope_department')
             .eq('id', id)
             .single();
 
@@ -1158,6 +1215,35 @@ export const updateElectionResultsVisibility = async (id: string, publish: boole
                     category: 'results',
                     route: '/dashboard'
                 });
+
+                setTimeout(async () => {
+                    try {
+                        let usersQuery = supabase.from('users').select('name, email, registration_completed, faculty, department').eq('role', 'VOTER');
+                        if (election.type === 'Faculty' || election.type === 'Departmental') {
+                            if (election.scope_faculty && election.scope_faculty !== 'All' && election.scope_faculty !== 'University-Wide') {
+                                usersQuery = usersQuery.eq('faculty', election.scope_faculty);
+                            }
+                            if (election.type === 'Departmental' && election.scope_department && election.scope_department !== 'All' && election.scope_department !== 'University-Wide') {
+                                usersQuery = usersQuery.eq('department', election.scope_department);
+                            }
+                        }
+
+                        const { data: votersInScope } = await usersQuery;
+                        const verifiedVoters = votersInScope?.filter(u => u.registration_completed) || [];
+
+                        const frontendUrl = process.env.ORIGIN || process.env.CORS_ORIGIN || 'http://localhost:3000';
+                        const dashboardUrl = `${frontendUrl}/dashboard`;
+
+                        await Promise.allSettled(
+                            verifiedVoters.map(voter =>
+                                sendElectionResultsEmail(voter.email, voter.name, data.title, dashboardUrl)
+                            )
+                        );
+                        console.log(`[Results Email] Dispatched results email to ${verifiedVoters.length} eligible voters.`);
+                    } catch (err) {
+                        console.error('[Results Email] Failed bulk mass email for results:', err);
+                    }
+                }, 0);
             }
         } catch (notifyError) {
             console.error('Notification dispatch failed:', notifyError);
@@ -1582,8 +1668,8 @@ export const createAdmin = async (adminData: any, creatorId: string) => {
 
         return {
             success: true,
-            message: setupLinkSent 
-                ? 'Admin account created and setup link sent successfully' 
+            message: setupLinkSent
+                ? 'Admin account created and setup link sent successfully'
                 : 'Admin account created successfully (failed to send setup link)',
             data
         };
@@ -1791,7 +1877,7 @@ const generatePDFReport = async (data: any): Promise<{ buffer: Buffer, contentTy
         doc.fontSize(14).text(`Date: ${data.date}`, { align: 'center' });
         doc.moveDown(0.5);
         doc.text('Prepared by: Electoral Committee System', { align: 'center' });
-        
+
         doc.addPage();
 
         // 2. Executive Summary
@@ -1801,7 +1887,7 @@ const generatePDFReport = async (data: any): Promise<{ buffer: Buffer, contentTy
         doc.text(`Method: ${data.method}`, { lineGap: 5 });
         doc.text(`Total Participation: ${data.totalParticipation} voters`, { lineGap: 5 });
         doc.text(`Turnout Rate: ${data.turnoutRate}`, { lineGap: 5 });
-        
+
         const winner = data.candidates[0];
         doc.moveDown(1);
         doc.text(`Primary Outcome: ${winner ? `${winner.name} led with ${winner.votes} votes (${winner.percentage}%)` : 'No votes recorded'}.`);
@@ -1830,10 +1916,10 @@ const generatePDFReport = async (data: any): Promise<{ buffer: Buffer, contentTy
 
         data.candidates.forEach((c: any, index: number) => {
             doc.fontSize(10).text(c.name, chartX - 50, startY + 5, { width: 45, align: 'right' });
-            
+
             const barWidth = (parseFloat(c.percentage) / 100) * maxBarWidth;
             doc.rect(chartX, startY, barWidth, 15).fill('#0ea5e9'); // primary color
-            
+
             doc.fillColor('black').text(`${c.votes} (${c.percentage}%)`, chartX + barWidth + 5, startY + 5);
             startY += 25;
 
@@ -1862,7 +1948,7 @@ const generateWordReport = async (data: any): Promise<{ buffer: Buffer, contentT
                     new Paragraph({ text: data.electionTitle, heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
                     new Paragraph({ text: `Date: ${data.date}`, alignment: AlignmentType.CENTER }),
                     new Paragraph({ text: 'Prepared by: Electoral Committee System', alignment: AlignmentType.CENTER }),
-                    
+
                     new Paragraph({ text: "", spacing: { before: 400, after: 400 } }), // Spacer
 
                     // Executive Summary

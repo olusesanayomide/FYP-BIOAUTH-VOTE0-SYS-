@@ -123,7 +123,13 @@ const resolveUserByIdentifier = async (rawIdentifier: string) => {
     );
   }
 
-  return syncUserEmailFromInstitutionRecord(users[0]);
+  const resolvedUser = await syncUserEmailFromInstitutionRecord(users[0]);
+
+  if (resolvedUser.status === 'SUSPENDED') {
+    throw new ApiError(403, 'Your account has been suspended. Please contact the administrator.', 'ACCOUNT_SUSPENDED');
+  }
+
+  return resolvedUser;
 };
 
 

@@ -66,6 +66,9 @@ const Candidates = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  const [positionsList, setPositionsList] = useState<string[]>([]);
+  const [isFetchingPositions, setIsFetchingPositions] = useState(false);
+
   // Form states
   const [form, setForm] = useState({
     name: "",
@@ -89,6 +92,30 @@ const Candidates = () => {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    const fetchPositions = async () => {
+      if (!form.electionId) {
+        setPositionsList([]);
+        return;
+      }
+      setIsFetchingPositions(true);
+      try {
+        const res = await apiClient.get(`/admin/elections/${form.electionId}/positions`);
+        if (res.data.success && res.data.positions) {
+          setPositionsList(res.data.positions);
+        } else {
+          setPositionsList([]);
+        }
+      } catch (err) {
+        console.error("Failed to load positions for election", err);
+        setPositionsList([]);
+      } finally {
+        setIsFetchingPositions(false);
+      }
+    };
+    fetchPositions();
+  }, [form.electionId]);
 
   const fetchInitialData = async () => {
     setIsLoading(true);
@@ -471,14 +498,43 @@ const Candidates = () => {
             <div className="glass-card rounded-2xl p-8 max-w-3xl">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Full Name</label>
-                  <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Candidate full name"
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:shadow-[0_0_15px_hsla(187,100%,50%,0.1)] transition-all duration-300" />
+                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Assign to Election</label>
+                  <select value={form.electionId} onChange={(e) => setForm({ ...form, electionId: e.target.value, position: "" })}
+                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none">
+                    <option value="">Select Election</option>
+                    {electionOptions.map((ec) => (
+                      <option key={ec.id} value={ec.id}>
+                        {ec.name} {ec.status === "ongoing" ? "(Ongoing)" : ec.status === "upcoming" ? "(Upcoming)" : "(Completed)"}
+                      </option>
+                    ))}
+                  </select>
+                  {allowedElections.length === 0 && !editingId && (
+                    <p className="text-xs text-warning">No ongoing or upcoming elections are available for candidate assignment.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Position</label>
-                  <input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} placeholder="e.g. President"
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 transition-all duration-300" />
+                  {positionsList.length > 0 ? (
+                    <select value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })}
+                      className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none"
+                    >
+                      <option value="">Select Position</option>
+                      {positionsList.map(pos => (
+                        <option key={pos} value={pos}>{pos}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} placeholder="e.g. President"
+                      className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 transition-all duration-300"
+                      disabled={isFetchingPositions}
+                    />
+                  )}
+                  {isFetchingPositions && <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3 animate-spin" /> Loading positions...</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Full Name</label>
+                  <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Candidate full name"
+                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:shadow-[0_0_15px_hsla(187,100%,50%,0.1)] transition-all duration-300" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Student ID</label>
@@ -527,21 +583,6 @@ const Candidates = () => {
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Level (optional)</label>
                   <input value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} placeholder="e.g. 300"
                     className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 transition-all duration-300" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground tracking-wide uppercase">Assign to Election</label>
-                  <select value={form.electionId} onChange={(e) => setForm({ ...form, electionId: e.target.value })}
-                    className="w-full h-12 px-4 rounded-lg bg-muted/40 border border-border/50 text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none">
-                    <option value="">Select Election</option>
-                    {electionOptions.map((ec) => (
-                      <option key={ec.id} value={ec.id}>
-                        {ec.name} {ec.status === "ongoing" ? "(Ongoing)" : ec.status === "upcoming" ? "(Upcoming)" : "(Completed)"}
-                      </option>
-                    ))}
-                  </select>
-                  {allowedElections.length === 0 && !editingId && (
-                    <p className="text-xs text-warning">No ongoing or upcoming elections are available for candidate assignment.</p>
-                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground tracking-wide uppercase">Approval Status</label>
