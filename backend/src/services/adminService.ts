@@ -1617,6 +1617,9 @@ export const importStudentData = async (
 export const createAdmin = async (adminData: any, creatorId: string) => {
     try {
         const { username, email } = adminData;
+        const normalizedRole = String(adminData?.role || 'admin').trim().toLowerCase() === 'super_admin'
+            ? 'super_admin'
+            : 'admin';
 
         if (!username || !email) {
             throw new ApiError(400, 'Username and email are required', 'VALIDATION_ERROR');
@@ -1627,12 +1630,15 @@ export const createAdmin = async (adminData: any, creatorId: string) => {
             .insert([{
                 username,
                 email,
+                role: normalizedRole,
+                status: 'ACTIVE',
+                created_by: creatorId,
                 can_manage_elections: true,
                 can_manage_users: true,
                 can_manage_candidates: true,
                 can_view_audit_logs: true
             }])
-            .select('id, username, email')
+            .select('id, username, email, role')
             .single();
 
         if (error) {
@@ -1652,6 +1658,7 @@ export const createAdmin = async (adminData: any, creatorId: string) => {
             details: JSON.stringify({
                 username: data.username,
                 email: data.email,
+                role: data.role,
                 description: `Created new admin account: ${data.username}`
             })
         });
@@ -1677,6 +1684,304 @@ export const createAdmin = async (adminData: any, creatorId: string) => {
         console.error('Error creating admin:', error);
         if (error instanceof ApiError) throw error;
         throw new ApiError(500, 'Failed to create admin account', 'DATABASE_ERROR');
+    }
+};
+
+export const getAdmins = async () => {
+    try {
+        const { data, error } = await supabase
+            .from('admin')
+            .select('id, username, email, role, status, can_manage_elections, can_manage_users, can_manage_candidates, can_view_audit_logs, webauthn_registered, created_at, last_login_at, created_by')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return {
+            success: true,
+            data: data || [],
+        };
+    } catch (error: any) {
+        console.error('Error fetching admins:', error);
+        throw new ApiError(500, 'Failed to fetch admin accounts', 'DATABASE_ERROR');
+    }
+};
+
+export const updateAdminAccount = async (targetAdminId: string, updateData: any, actorAdminId: string) => {
+    try {
+        const { data: actor, error: actorError } = await supabase
+            .from('admin')
+            .select('id, role')
+            .eq('id', actorAdminId)
+            .single();
+
+        if (actorError || !actor) {
+            throw new ApiError(404, 'Acting admin not found', 'ADMIN_NOT_FOUND');
+        }
+
+        const { data: target, error: targetError } = await supabase
+            .from('admin')
+            .select('*')
+            .eq('id', targetAdminId)
+            .single();
+
+        if (targetError || !target) {
+            throw new ApiError(404, 'Target admin not found', 'ADMIN_NOT_FOUND');
+        }
+
+        const normalizedRole = String(updateData?.role || target.role || 'admin').trim().toLowerCase() === 'super_admin'
+            ? 'super_admin'
+            : 'admin';
+
+        if (target.id === actorAdminId && target.role === 'super_admin' && normalizedRole !== 'super_admin') {
+            throw new ApiError(400, 'You cannot remove your own super admin role', 'INVALID_OPERATION');
+        }
+
+        const payload = {
+            role: normalizedRole,
+            can_manage_elections: updateData?.can_manage_elections ?? target.can_manage_elections,
+            can_manage_users: updateData?.can_manage_users ?? target.can_manage_users,
+            can_manage_candidates: updateData?.can_manage_candidates ?? target.can_manage_candidates,
+            can_view_audit_logs: updateData?.can_view_audit_logs ?? target.can_view_audit_logs,
+        };
+
+        const { data, error } = await supabase
+            .from('admin')
+            .update(payload)
+            .eq('id', targetAdminId)
+            .select('id, username, email, role, status, can_manage_elections, can_manage_users, can_manage_candidates, can_view_audit_logs, webauthn_registered, created_at, last_login_at, created_by')
+            .single();
+
+        if (error) throw error;
+
+        await supabase.from('audit_logs').insert({
+            action: 'ADMIN_UPDATED',
+            resource_type: 'ADMIN',
+            resource_id: targetAdminId,
+            admin_id: actorAdminId,
+            status: 'SUCCESS',
+            details: JSON.stringify({
+                username: target.username,
+                email: target.email,
+                role: normalizedRole,
+                description: `Updated administrator account: ${target.username}`
+            })
+        });
+
+        return {
+            success: true,
+            message: 'Administrator updated successfully',
+            data
+        };
+    } catch (error: any) {
+        console.error('Error updating admin:', error);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, 'Failed to update administrator', 'DATABASE_ERROR');
+    }
+};
+
+export const updateAdminStatus = async (targetAdminId: string, status: 'ACTIVE' | 'SUSPENDED', actorAdminId: string) => {
+    try {
+        const { data: actor, error: actorError } = await supabase
+            .from('admin')
+            .select('id, role')
+            .eq('id', actorAdminId)
+            .single();
+
+        if (actorError || !actor) {
+            throw new ApiError(404, 'Acting admin not found', 'ADMIN_NOT_FOUND');
+        }
+
+        const { data: target, error: targetError } = await supabase
+            .from('admin')
+            .select('id, username, email, role, status')
+            .eq('id', targetAdminId)
+            .single();
+
+        if (targetError || !target) {
+            throw new ApiError(404, 'Target admin not found', 'ADMIN_NOT_FOUND');
+        }
+
+        if (target.id === actorAdminId && status === 'SUSPENDED') {
+            throw new ApiError(400, 'You cannot suspend your own account', 'INVALID_OPERATION');
+        }
+
+        if (target.role === 'super_admin' && status === 'SUSPENDED') {
+            const { count } = await supabase
+                .from('admin')
+                .select('*', { count: 'exact', head: true })
+                .eq('role', 'super_admin')
+                .neq('status', 'SUSPENDED');
+
+            if ((count || 0) <= 1) {
+                throw new ApiError(400, 'Cannot suspend the last active super admin', 'INVALID_OPERATION');
+            }
+        }
+
+        const { data, error } = await supabase
+            .from('admin')
+            .update({
+                status,
+                suspended_at: status === 'SUSPENDED' ? new Date().toISOString() : null,
+            })
+            .eq('id', targetAdminId)
+            .select('id, username, email, role, status, can_manage_elections, can_manage_users, can_manage_candidates, can_view_audit_logs, webauthn_registered, created_at, last_login_at, created_by')
+            .single();
+
+        if (error) throw error;
+
+        await supabase.from('audit_logs').insert({
+            action: 'ADMIN_STATUS_UPDATED',
+            resource_type: 'ADMIN',
+            resource_id: targetAdminId,
+            admin_id: actorAdminId,
+            status: 'SUCCESS',
+            details: JSON.stringify({
+                username: target.username,
+                email: target.email,
+                new_status: status,
+                description: `Updated administrator status for ${target.username} to ${status}`
+            })
+        });
+
+        return {
+            success: true,
+            message: `Administrator ${status === 'SUSPENDED' ? 'suspended' : 'activated'} successfully`,
+            data
+        };
+    } catch (error: any) {
+        console.error('Error updating admin status:', error);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, 'Failed to update administrator status', 'DATABASE_ERROR');
+    }
+};
+
+export const resetAdminSecurity = async (targetAdminId: string, actorAdminId: string) => {
+    try {
+        const { data: target, error: targetError } = await supabase
+            .from('admin')
+            .select('id, username, email')
+            .eq('id', targetAdminId)
+            .single();
+
+        if (targetError || !target) {
+            throw new ApiError(404, 'Target admin not found', 'ADMIN_NOT_FOUND');
+        }
+
+        const { error: authenticatorDeleteError } = await supabase
+            .from('admin_authenticators')
+            .delete()
+            .eq('admin_id', targetAdminId);
+
+        if (authenticatorDeleteError) throw authenticatorDeleteError;
+
+        const { error: updateError } = await supabase
+            .from('admin')
+            .update({
+                webauthn_registered: false,
+                current_challenge: null,
+                current_challenge_expires_at: null,
+                otp_hash: null,
+                otp_expires_at: null,
+                otp_attempts: 0,
+                registration_token: null,
+                registration_token_expires_at: null,
+            })
+            .eq('id', targetAdminId);
+
+        if (updateError) throw updateError;
+
+        let setupLinkSent = false;
+        try {
+            const { requestAdminSetupLink } = await import('./authService');
+            await requestAdminSetupLink(target.email);
+            setupLinkSent = true;
+        } catch (linkError) {
+            console.error('[AdminService] Security reset completed but failed to send setup link:', linkError);
+        }
+
+        await supabase.from('audit_logs').insert({
+            action: 'ADMIN_SECURITY_RESET',
+            resource_type: 'ADMIN',
+            resource_id: targetAdminId,
+            admin_id: actorAdminId,
+            status: 'SUCCESS',
+            details: JSON.stringify({
+                username: target.username,
+                email: target.email,
+                description: `Reset security credentials for administrator ${target.username}`
+            })
+        });
+
+        return {
+            success: true,
+            message: setupLinkSent
+                ? 'Administrator security reset and setup link sent successfully'
+                : 'Administrator security reset successfully',
+        };
+    } catch (error: any) {
+        console.error('Error resetting admin security:', error);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, 'Failed to reset administrator security', 'DATABASE_ERROR');
+    }
+};
+
+export const deleteAdminAccount = async (targetAdminId: string, actorAdminId: string) => {
+    try {
+        const { data: target, error: targetError } = await supabase
+            .from('admin')
+            .select('id, username, email, role, status')
+            .eq('id', targetAdminId)
+            .single();
+
+        if (targetError || !target) {
+            throw new ApiError(404, 'Target admin not found', 'ADMIN_NOT_FOUND');
+        }
+
+        if (target.id === actorAdminId) {
+            throw new ApiError(400, 'You cannot delete your own account', 'INVALID_OPERATION');
+        }
+
+        if (target.role === 'super_admin') {
+            const { count } = await supabase
+                .from('admin')
+                .select('*', { count: 'exact', head: true })
+                .eq('role', 'super_admin')
+                .neq('status', 'SUSPENDED');
+
+            if ((count || 0) <= 1 && target.status !== 'SUSPENDED') {
+                throw new ApiError(400, 'Cannot delete the last active super admin', 'INVALID_OPERATION');
+            }
+        }
+
+        const { error } = await supabase
+            .from('admin')
+            .delete()
+            .eq('id', targetAdminId);
+
+        if (error) throw error;
+
+        await supabase.from('audit_logs').insert({
+            action: 'ADMIN_DELETED',
+            resource_type: 'ADMIN',
+            resource_id: targetAdminId,
+            admin_id: actorAdminId,
+            status: 'SUCCESS',
+            details: JSON.stringify({
+                username: target.username,
+                email: target.email,
+                role: target.role,
+                description: `Deleted administrator account: ${target.username}`
+            })
+        });
+
+        return {
+            success: true,
+            message: 'Administrator deleted successfully',
+        };
+    } catch (error: any) {
+        console.error('Error deleting admin:', error);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, 'Failed to delete administrator', 'DATABASE_ERROR');
     }
 };
 

@@ -13,6 +13,8 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+const isAdminRole = (role?: string) => role === 'admin' || role === 'super_admin';
+
 /**
  * JWT Authentication Middleware
  * Verifies JWT token from Authorization header
@@ -35,8 +37,17 @@ export const authMiddleware = async (
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     console.log(`[AUTH] Token verified: sub=${decoded.sub}, role=${decoded.role}`);
 
-    // Check if user is suspended (Only for non-admin users)
-    if (decoded.role !== 'admin') {
+    if (isAdminRole(decoded.role)) {
+      const { data: admin } = await supabase
+        .from('admin')
+        .select('status')
+        .eq('id', decoded.sub)
+        .maybeSingle();
+
+      if (admin && admin.status === 'SUSPENDED') {
+        throw new ApiError(403, 'Your admin account has been suspended. Please contact the super administrator.', 'ACCOUNT_SUSPENDED');
+      }
+    } else {
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('status')
@@ -101,11 +112,26 @@ export const adminMiddleware = (
   res: Response,
   next: NextFunction,
 ) => {
-  if (req.user?.role !== 'admin') {
+  if (!isAdminRole(req.user?.role)) {
     return res.status(403).json({
       error: 'Admin access required',
       code: 'FORBIDDEN',
     });
   }
+  next();
+};
+
+export const superAdminMiddleware = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  if (req.user?.role !== 'super_admin') {
+    return res.status(403).json({
+      error: 'Super admin access required',
+      code: 'SUPER_ADMIN_REQUIRED',
+    });
+  }
+
   next();
 };

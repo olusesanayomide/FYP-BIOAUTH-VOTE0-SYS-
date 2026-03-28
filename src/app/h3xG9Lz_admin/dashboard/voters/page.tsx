@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import apiClient from "@/services/api";
+import { isStoredSuperAdmin } from "@/lib/adminSession";
 
 type BioStatus = "verified" | "not_enrolled" | "flagged";
 type VoteStatus = "voted" | "not_voted";
@@ -98,6 +99,7 @@ const Voters = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -109,7 +111,7 @@ const Voters = () => {
     const allowed = ['csv', 'xlsx', 'xls'];
 
     if (!allowed.includes(ext || '')) {
-      alert("Only CSV and Excel files are allowed.");
+      setImportError("Only CSV and Excel files are allowed.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -156,6 +158,7 @@ const Voters = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    setIsSuperAdmin(isStoredSuperAdmin());
     fetchVoters();
   }, []);
 
@@ -232,6 +235,7 @@ const Voters = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (!isSuperAdmin) return;
     setDeleteTarget({ id, name });
     setShowDeleteModal(true);
   };
@@ -389,9 +393,11 @@ const Voters = () => {
                                   <Play className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                              <button onClick={() => handleDelete(v.id, v.name)} className="p-1.5 rounded border border-transparent text-muted-foreground hover:text-destructive hover:bg-destructive/5 hover:border-destructive/25 transition-all" title="Delete Voter">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {isSuperAdmin && (
+                                <button onClick={() => handleDelete(v.id, v.name)} className="p-1.5 rounded border border-transparent text-muted-foreground hover:text-destructive hover:bg-destructive/5 hover:border-destructive/25 transition-all" title="Delete Voter">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </motion.tr>
@@ -513,9 +519,11 @@ const Voters = () => {
                         <Play className="w-3.5 h-3.5" /> Activate
                       </button>
                     )}
-                    <button onClick={() => handleDelete(selected.id, selected.name)} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-destructive/5 border border-destructive/20 text-xs text-destructive hover:bg-destructive/10 transition-all">
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
-                    </button>
+                    {isSuperAdmin && (
+                      <button onClick={() => handleDelete(selected.id, selected.name)} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-destructive/5 border border-destructive/20 text-xs text-destructive hover:bg-destructive/10 transition-all">
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -523,6 +531,12 @@ const Voters = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!isSuperAdmin && (
+        <div className="mt-4 rounded-xl border border-border/30 bg-muted/15 px-4 py-3 text-xs text-muted-foreground">
+          Permanent voter deletion is restricted to super admins.
+        </div>
+      )}
 
       {/* Import Confirmation Modal */}
       {showImportModal && (

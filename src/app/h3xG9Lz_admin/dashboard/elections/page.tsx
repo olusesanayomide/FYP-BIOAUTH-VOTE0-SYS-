@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import apiClient from "@/services/api";
+import { isStoredSuperAdmin } from "@/lib/adminSession";
 
 type ElectionStatus = "ongoing" | "upcoming" | "completed" | "suspended";
 type ViewMode = "list" | "create" | "detail";
@@ -73,9 +74,12 @@ const Elections = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isExporting, setIsExporting] = useState<"pdf" | "docx" | null>(null);
   const [showExportOptions, setShowExportOptions] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Fetch elections on mount
   useEffect(() => {
+    setIsSuperAdmin(isStoredSuperAdmin());
     fetchElections();
   }, []);
 
@@ -261,6 +265,7 @@ const Elections = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (!isSuperAdmin) return;
     setDeleteTarget({ id, name });
     setShowDeleteConfirm(true);
   };
@@ -297,7 +302,7 @@ const Elections = () => {
       setDeleteTarget(null);
     } catch (error) {
       console.error(error);
-      alert("Failed to delete election");
+      setFeedbackMessage({ text: "Failed to delete election", type: "error" });
     }
   };
 
@@ -352,7 +357,7 @@ const Elections = () => {
       document.body.removeChild(a);
     } catch (error) {
       console.error("Export failed", error);
-      alert("Failed to export election report. Please try again.");
+      setFeedbackMessage({ text: "Failed to export election report. Please try again.", type: "error" });
     } finally {
       setIsExporting(null);
       setShowExportOptions(false);
@@ -365,6 +370,11 @@ const Elections = () => {
         {/* â”€â”€â”€â”€â”€ LIST VIEW â”€â”€â”€â”€â”€ */}
         {view === "list" && (
           <motion.div key="list" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
+            {feedbackMessage && (
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${feedbackMessage.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-destructive/20 bg-destructive/5 text-destructive"}`}>
+                {feedbackMessage.text}
+              </div>
+            )}
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -492,20 +502,22 @@ const Elections = () => {
                               <PlayCircle className="w-3 h-3" /> Resume
                             </button>
                           )}
-                          <button
-                            onClick={() => {
-                              if (ongoingByTime) return;
-                              handleDelete(el.id, el.name);
-                            }}
-                            disabled={ongoingByTime}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all ml-auto ${ongoingByTime
-                              ? "text-muted-foreground/50 cursor-not-allowed"
-                              : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              }`}
-                            title={ongoingByTime ? "Cannot delete an ongoing election" : "Delete Election"}
-                          >
-                            <Trash className="w-3 h-3" /> Delete
-                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => {
+                                if (ongoingByTime) return;
+                                handleDelete(el.id, el.name);
+                              }}
+                              disabled={ongoingByTime}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all ml-auto ${ongoingByTime
+                                ? "text-muted-foreground/50 cursor-not-allowed"
+                                : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                }`}
+                              title={ongoingByTime ? "Cannot delete an ongoing election" : "Delete Election"}
+                            >
+                              <Trash className="w-3 h-3" /> Delete
+                            </button>
+                          )}
                         </div>
                       </motion.div>
                     );
@@ -711,6 +723,11 @@ const Elections = () => {
         {/* â”€â”€â”€â”€â”€ DETAIL VIEW â”€â”€â”€â”€â”€ */}
         {view === "detail" && selectedElection && (
           <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
+            {feedbackMessage && (
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${feedbackMessage.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-destructive/20 bg-destructive/5 text-destructive"}`}>
+                {feedbackMessage.text}
+              </div>
+            )}
             {(() => {
               const end = new Date(selectedElection.rawEndDate);
               const canPublishResults = !isNaN(end.getTime()) && new Date() > end;
@@ -729,6 +746,11 @@ const Elections = () => {
                   <button onClick={() => setShowSuspendConfirm(selectedElection.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-warning bg-warning/5 hover:bg-warning/10 border border-warning/20 transition-all">
                     <PauseCircle className="w-4 h-4" /> Suspend
                   </button>
+                )}
+                {!isSuperAdmin && (
+                  <div className="px-3 py-2 rounded-lg text-xs text-muted-foreground border border-border/30 bg-muted/15">
+                    Delete controls are reserved for super admins.
+                  </div>
                 )}
                 <div className="relative">
                   <button

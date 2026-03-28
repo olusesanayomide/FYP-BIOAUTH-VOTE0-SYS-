@@ -1,7 +1,7 @@
 "use client"
 
 import { Bell, CheckCircle2, Clock, LogOut, Menu, Settings, User, XCircle } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { getSystemSettings } from "@/services/adminService"
 import { ThemeToggle } from "@/components/ThemeToggle"
@@ -22,6 +22,8 @@ interface TopNavNotification {
 }
 
 export function TopNav({ onToggleSidebar }: TopNavProps) {
+  const notifMenuRef = useRef<HTMLDivElement | null>(null)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
   const pathname = usePathname()
   const [universityName, setUniversityName] = useState("University Voting Portal")
@@ -146,6 +148,23 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
     return () => document.removeEventListener("keydown", onEsc)
   }, [])
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node
+
+      if (showNotifMenu && notifMenuRef.current && !notifMenuRef.current.contains(target)) {
+        setShowNotifMenu(false)
+      }
+
+      if (showProfileMenu && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setShowProfileMenu(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => document.removeEventListener("mousedown", handleOutsideClick)
+  }, [showNotifMenu, showProfileMenu])
+
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications])
 
   const markAllRead = async () => {
@@ -214,7 +233,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
         <div className="touch-target flex items-center justify-center hidden md:flex">
           <ThemeToggle />
         </div>
-        <div className="relative">
+        <div className="relative" ref={notifMenuRef}>
           <button
             onClick={() => {
               setShowNotifMenu((v) => !v)
@@ -259,7 +278,7 @@ export function TopNav({ onToggleSidebar }: TopNavProps) {
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative" ref={profileMenuRef}>
           <button
             onClick={() => {
               setShowProfileMenu((v) => !v)

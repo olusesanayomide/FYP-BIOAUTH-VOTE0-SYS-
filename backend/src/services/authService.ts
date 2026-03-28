@@ -22,6 +22,10 @@ const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '15'); // 
 const OTP_RATE_LIMIT_MINUTES = 1;
 
 const normalizeEmail = (value: string | null | undefined) => String(value || '').trim().toLowerCase();
+const normalizeAdminRole = (value: string | null | undefined): 'admin' | 'super_admin' => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'super_admin' ? 'super_admin' : 'admin';
+};
 
 const syncUserEmailFromInstitutionRecord = async (user: any) => {
   const userEmail = normalizeEmail(user?.email);
@@ -1005,6 +1009,13 @@ export const adminLogin = async (email: string, passwordString: string, ipAddres
     throw new ApiError(401, 'Invalid credentials', 'UNAUTHORIZED');
   }
 
+  if (adminUser.status === 'SUSPENDED') {
+    await logAuditAction(adminUser.id, 'ADMIN_LOGIN_FAILURE', 'ADMIN', adminUser.id, 'FAILURE', ipAddress, userAgent);
+    throw new ApiError(403, 'Admin account suspended', 'ACCOUNT_SUSPENDED');
+  }
+
+  const adminRole = normalizeAdminRole(adminUser.role);
+
   // Update last login
   await supabase
     .from('admin')
@@ -1017,7 +1028,7 @@ export const adminLogin = async (email: string, passwordString: string, ipAddres
     email: adminUser.email,
     matricNumber: 'ADMIN', // Admins don't have matric numbers
     name: adminUser.username,
-    role: 'admin',
+    role: adminRole,
   });
 
   await logAuditAction(adminUser.id, 'ADMIN_LOGIN_SUCCESS', 'ADMIN', adminUser.id, 'SUCCESS', ipAddress, userAgent);
@@ -1030,12 +1041,13 @@ export const adminLogin = async (email: string, passwordString: string, ipAddres
         id: adminUser.id,
         email: adminUser.email,
         name: adminUser.username,
-        role: 'admin',
+        role: adminRole,
         permissions: {
           manageElections: adminUser.can_manage_elections,
           manageUsers: adminUser.can_manage_users,
           manageCandidates: adminUser.can_manage_candidates,
-          viewAuditLogs: adminUser.can_view_audit_logs
+          viewAuditLogs: adminUser.can_view_audit_logs,
+          isSuperAdmin: adminRole === 'super_admin',
         }
       },
     },
@@ -1331,6 +1343,10 @@ export const getAdminAuthenticationOptions = async (adminId: string) => {
     throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
   }
 
+  if (admin.status === 'SUSPENDED') {
+    throw new ApiError(403, 'Admin account suspended', 'ACCOUNT_SUSPENDED');
+  }
+
   const { data: authenticators, error: authError } = await supabase
     .from('admin_authenticators')
     .select('*')
@@ -1378,6 +1394,10 @@ export const verifyAdminAuthentication = async (adminId: string, response: any, 
     throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
   }
 
+  if (admin.status === 'SUSPENDED') {
+    throw new ApiError(403, 'Admin account suspended', 'ACCOUNT_SUSPENDED');
+  }
+
   if (!admin.current_challenge) {
     throw new ApiError(400, 'No authentication challenge found. Start over.', 'CHALLENGE_NOT_FOUND');
   }
@@ -1399,6 +1419,8 @@ export const verifyAdminAuthentication = async (adminId: string, response: any, 
   if (!authenticator) {
     throw new ApiError(404, 'Authenticator not found on this account.', 'AUTHENTICATOR_NOT_FOUND');
   }
+
+  const adminRole = normalizeAdminRole(admin.role);
 
   try {
     const decryptedPublicKey = decryptData(authenticator.public_key_encrypted, authenticator.public_key_iv);
@@ -1447,7 +1469,7 @@ export const verifyAdminAuthentication = async (adminId: string, response: any, 
       email: admin.email,
       matricNumber: 'ADMIN',
       name: admin.username,
-      role: 'admin',
+      role: adminRole,
     });
 
     await logAuditAction(admin.id, 'ADMIN_WEBAUTHN_LOGIN_SUCCESS', 'ADMIN', admin.id, 'SUCCESS', ipAddress, userAgent);
@@ -1460,12 +1482,13 @@ export const verifyAdminAuthentication = async (adminId: string, response: any, 
           id: admin.id,
           email: admin.email,
           name: admin.username,
-          role: 'admin',
+          role: adminRole,
           permissions: {
             manageElections: admin.can_manage_elections,
             manageUsers: admin.can_manage_users,
             manageCandidates: admin.can_manage_candidates,
-            viewAuditLogs: admin.can_view_audit_logs
+            viewAuditLogs: admin.can_view_audit_logs,
+            isSuperAdmin: adminRole === 'super_admin',
           }
         },
       },
@@ -1491,6 +1514,10 @@ export const requestAdminOtp = async (adminId: string) => {
 
   if (error || !admin) {
     throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
+  }
+
+  if ((admin as any).status === 'SUSPENDED') {
+    throw new ApiError(403, 'Admin account suspended', 'ACCOUNT_SUSPENDED');
   }
 
   // Generate OTP
@@ -1542,6 +1569,10 @@ export const verifyAdminOtp = async (adminId: string, otpCode: string, ipAddress
     throw new ApiError(404, 'Admin not found', 'ADMIN_NOT_FOUND');
   }
 
+  if (admin.status === 'SUSPENDED') {
+    throw new ApiError(403, 'Admin account suspended', 'ACCOUNT_SUSPENDED');
+  }
+
   if (!admin.otp_expires_at) {
     throw new ApiError(400, 'No OTP found. Request a new one.', 'OTP_NOT_FOUND');
   }
@@ -1565,6 +1596,8 @@ export const verifyAdminOtp = async (adminId: string, otpCode: string, ipAddress
     throw new ApiError(400, 'Invalid OTP code', 'INVALID_OTP');
   }
 
+  const adminRole = normalizeAdminRole(admin.role);
+
   // Clear OTP and update last login
   await supabase
     .from('admin')
@@ -1582,7 +1615,7 @@ export const verifyAdminOtp = async (adminId: string, otpCode: string, ipAddress
     email: admin.email,
     matricNumber: 'ADMIN',
     name: admin.username,
-    role: 'admin',
+    role: adminRole,
   });
 
   await logAuditAction(admin.id, 'ADMIN_OTP_LOGIN_SUCCESS', 'ADMIN', admin.id, 'SUCCESS', ipAddress, userAgent);
@@ -1595,13 +1628,14 @@ export const verifyAdminOtp = async (adminId: string, otpCode: string, ipAddress
         id: admin.id,
         email: admin.email,
         name: admin.username,
-        role: 'admin',
+        role: adminRole,
         permissions: {
           manageElections: admin.can_manage_elections,
           manageUsers: admin.can_manage_users,
           manageCandidates: admin.can_manage_candidates,
           viewAuditLogs: admin.can_view_audit_logs,
-          isRegistered: admin.webauthn_registered
+          isRegistered: admin.webauthn_registered,
+          isSuperAdmin: adminRole === 'super_admin',
         }
       },
     },

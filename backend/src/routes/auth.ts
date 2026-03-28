@@ -480,23 +480,25 @@ router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respons
     let user;
     let queryError;
 
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'super_admin') {
       const { data: admin, error } = await supabase
         .from('admin')
-        .select('id, email, username, can_manage_elections, can_manage_users, can_manage_candidates, can_view_audit_logs')
+        .select('id, email, username, role, can_manage_elections, can_manage_users, can_manage_candidates, can_view_audit_logs')
         .eq('id', req.user.id)
         .single();
 
+      const adminRole = String(admin?.role || '').trim().toLowerCase() === 'super_admin' ? 'super_admin' : 'admin';
       user = admin ? {
         id: admin.id,
         email: admin.email,
         name: admin.username,
-        role: 'admin',
+        role: adminRole,
         permissions: {
           manageElections: admin.can_manage_elections,
           manageUsers: admin.can_manage_users,
           manageCandidates: admin.can_manage_candidates,
-          viewAuditLogs: admin.can_view_audit_logs
+          viewAuditLogs: admin.can_view_audit_logs,
+          isSuperAdmin: adminRole === 'super_admin',
         }
       } : null;
       queryError = error;

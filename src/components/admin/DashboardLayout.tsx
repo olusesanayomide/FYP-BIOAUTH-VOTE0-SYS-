@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Vote, Users, UserCheck, Fingerprint, FileText,
@@ -38,6 +38,8 @@ interface AdminNotification {
 }
 
 const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayoutProps) => {
+  const notifMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -157,6 +159,23 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      if (isNotifOpen && notifMenuRef.current && !notifMenuRef.current.contains(target)) {
+        setIsNotifOpen(false);
+      }
+
+      if (isProfileOpen && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isNotifOpen, isProfileOpen]);
 
   return (
     <div className="min-h-screen flex admin-shell overflow-x-hidden">
@@ -285,7 +304,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
             >
               <Search className="w-4 h-4" />
             </button>
-            <div className="relative">
+            <div className="relative" ref={notifMenuRef}>
               <button
                 onClick={() => {
                   setIsNotifOpen((prev) => !prev);
@@ -361,7 +380,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
                 )}
               </AnimatePresence>
             </div>
-            <div className="relative">
+            <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => {
                   setIsProfileOpen((prev) => !prev);

@@ -6,6 +6,7 @@ import { Users, Plus, Eye, Edit, CheckCircle2, Clock, XCircle, X, UserCircle, Fi
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import { supabase } from "@/lib/supabase";
 import apiClient from "@/services/api";
+import { isStoredSuperAdmin } from "@/lib/adminSession";
 
 type CandidateStatus = "approved" | "pending" | "rejected";
 type ViewMode = "list" | "add" | "detail";
@@ -65,6 +66,9 @@ const Candidates = () => {
   const [electionsConfig, setElectionsConfig] = useState<{ id: string, name: string, status: "ongoing" | "upcoming" | "completed" | "suspended" }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const [positionsList, setPositionsList] = useState<string[]>([]);
   const [isFetchingPositions, setIsFetchingPositions] = useState(false);
@@ -88,8 +92,10 @@ const Candidates = () => {
   const [existingManifestoUrl, setExistingManifestoUrl] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [actionMessage, setActionMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
+    setIsSuperAdmin(isStoredSuperAdmin());
     fetchInitialData();
   }, []);
 
@@ -296,23 +302,35 @@ const Candidates = () => {
       });
     } catch (error) {
       console.error(error);
-      alert("Failed to update candidate status");
+      setActionMessage({ text: "Failed to update candidate status", type: "error" });
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to permanently delete candidate: ${name}?`)) return;
+    if (!isSuperAdmin) return;
+    setDeleteTarget({ id, name });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
 
     try {
-      const response = await apiClient.delete(`/admin/candidates/${id}`);
+      const response = await apiClient.delete(`/admin/candidates/${deleteTarget.id}`);
       const data = response.data;
       if (!data.success) throw new Error(data.error || data.message || "Failed to delete candidate");
 
       // Remove local copy
-      setCandidates(prev => prev.filter(c => c.id !== id));
+      setCandidates(prev => prev.filter(c => c.id !== deleteTarget.id));
+      if (selected?.id === deleteTarget.id) {
+        setSelected(null);
+        setView("list");
+      }
+      setShowDeleteModal(false);
+      setDeleteTarget(null);
     } catch (error) {
       console.error(error);
-      alert("Failed to delete candidate");
+      setActionMessage({ text: "Failed to delete candidate", type: "error" });
     }
   };
 
@@ -377,6 +395,11 @@ const Candidates = () => {
         {/* LIST */}
         {view === "list" && (
           <motion.div key="list" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+            {actionMessage && (
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${actionMessage.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-destructive/20 bg-destructive/5 text-destructive"}`}>
+                {actionMessage.text}
+              </div>
+            )}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <Users className="w-5 h-5 text-primary" />
@@ -389,6 +412,12 @@ const Candidates = () => {
                 <Plus className="w-4 h-4" /> Add Candidate
               </button>
             </div>
+
+            {!isSuperAdmin && (
+              <div className="mb-4 rounded-xl border border-border/30 bg-muted/15 px-4 py-3 text-xs text-muted-foreground">
+                Permanent candidate deletion is restricted to super admins.
+              </div>
+            )}
 
             {/* Filters & Search */}
             <div className="flex flex-wrap gap-3 mb-6">
@@ -466,7 +495,7 @@ const Candidates = () => {
                                   <button onClick={() => handleStatusChange(c.id, "rejected")} className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all" title="Reject"><Ban className="w-3.5 h-3.5" /></button>
                                 )}
 
-                                {c.status === "rejected" && (
+                                {isSuperAdmin && c.status === "rejected" && (
                                   <button onClick={() => handleDelete(c.id, c.name)} className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all border border-transparent hover:border-destructive/20 ml-1" title="Permanently Delete">
                                     <X className="w-3.5 h-3.5" />
                                   </button>
@@ -487,6 +516,11 @@ const Candidates = () => {
         {/* ADD */}
         {view === "add" && (
           <motion.div key="add" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+            {actionMessage && (
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${actionMessage.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-destructive/20 bg-destructive/5 text-destructive"}`}>
+                {actionMessage.text}
+              </div>
+            )}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 {editingId ? <Edit className="w-5 h-5 text-primary" /> : <Plus className="w-5 h-5 text-primary" />}
@@ -639,6 +673,11 @@ const Candidates = () => {
         {/* DETAIL */}
         {view === "detail" && selected && (
           <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+            {actionMessage && (
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${actionMessage.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-destructive/20 bg-destructive/5 text-destructive"}`}>
+                {actionMessage.text}
+              </div>
+            )}
             <div className="flex items-center gap-3 mb-6">
               <button onClick={() => setView("list")} className="text-muted-foreground hover:text-foreground transition-colors text-sm">← Back</button>
               <h2 className="text-xl font-semibold text-foreground">{selected.name}</h2>
@@ -709,6 +748,45 @@ const Candidates = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showDeleteModal && deleteTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card max-w-md w-full p-6 border border-destructive/30"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                <X className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Delete Candidate</h3>
+                <p className="text-xs text-muted-foreground">{deleteTarget.name}</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-6">
+              This will permanently delete this candidate record. This action cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
+                className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-xs font-medium rounded-lg bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/15 transition-all"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

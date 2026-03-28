@@ -3,7 +3,10 @@ CREATE TABLE IF NOT EXISTS public.admin (
     id UUID PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255),
-    role VARCHAR(50) DEFAULT 'ADMIN',
+    role VARCHAR(50) DEFAULT 'admin',
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_by UUID REFERENCES public.admin(id) ON DELETE SET NULL,
+    suspended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     last_login_at TIMESTAMPTZ
 );

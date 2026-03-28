@@ -6,6 +6,22 @@ export interface AppSetting {
     description?: string;
 }
 
+export interface AdminAccount {
+    id: string;
+    username: string;
+    email: string;
+    role: "admin" | "super_admin";
+    status: "ACTIVE" | "SUSPENDED";
+    can_manage_elections: boolean;
+    can_manage_users: boolean;
+    can_manage_candidates: boolean;
+    can_view_audit_logs: boolean;
+    webauthn_registered?: boolean;
+    created_at?: string;
+    last_login_at?: string | null;
+    created_by?: string | null;
+}
+
 /**
  * Fetch global system settings (e.g. University Name)
  */
@@ -62,6 +78,66 @@ export const createAdmin = async (adminData: any): Promise<ApiResponse> => {
         return {
             success: false,
             error: error.response?.data?.message || 'Failed to create admin account',
+        };
+    }
+};
+
+export const getAdmins = async (): Promise<ApiResponse<AdminAccount[]>> => {
+    try {
+        const response = await apiClient.get('/admin/admins');
+        return response.data;
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.response?.data?.error || 'Failed to fetch admin accounts',
+        };
+    }
+};
+
+export const updateAdminAccount = async (adminId: string, payload: Partial<AdminAccount>): Promise<ApiResponse<AdminAccount>> => {
+    try {
+        const response = await apiClient.patch(`/admin/admins/${adminId}`, payload);
+        return response.data;
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.response?.data?.error || 'Failed to update admin account',
+        };
+    }
+};
+
+export const updateAdminStatus = async (adminId: string, status: "ACTIVE" | "SUSPENDED"): Promise<ApiResponse<AdminAccount>> => {
+    try {
+        const response = await apiClient.patch(`/admin/admins/${adminId}/status`, { status });
+        return response.data;
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.response?.data?.error || 'Failed to update admin status',
+        };
+    }
+};
+
+export const resetAdminSecurity = async (adminId: string): Promise<ApiResponse> => {
+    try {
+        const response = await apiClient.post(`/admin/admins/${adminId}/reset-security`);
+        return response.data;
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.response?.data?.error || 'Failed to reset admin security',
+        };
+    }
+};
+
+export const deleteAdminAccount = async (adminId: string): Promise<ApiResponse> => {
+    try {
+        const response = await apiClient.delete(`/admin/admins/${adminId}`);
+        return response.data;
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.response?.data?.error || 'Failed to delete admin account',
         };
     }
 };

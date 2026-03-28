@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { getDashboardStats, createElection, getAllElections, getElectionPositions, getAllCandidates, createCandidate, updateCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs, exportElectionResults } from '../services/adminService';
-import { authMiddleware, adminMiddleware } from '../middleware/auth';
+import { getDashboardStats, createElection, getAllElections, getElectionPositions, getAllCandidates, createCandidate, updateCandidate, getAllVoters, updateVoterStatus, deleteVoter, updateCandidateStatus, deleteCandidate, updateElection, updateElectionStatus, updateElectionResultsVisibility, getElectionAnalytics, deleteElection, getSystemSettings, updateSystemSettings, getAuditLogs, importStudentData, createAdmin, exportAuditLogs, exportElectionResults, getAdmins, updateAdminAccount, updateAdminStatus, resetAdminSecurity, deleteAdminAccount } from '../services/adminService';
+import { authMiddleware, adminMiddleware, superAdminMiddleware } from '../middleware/auth';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -44,7 +44,7 @@ router.get('/settings', async (req: Request, res: Response, next: NextFunction) 
  * @desc    Update global application settings
  * @access  Private (Admin only)
  */
-router.post('/settings', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/settings', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const adminId = (req as any).user.id;
         const settings = await updateSystemSettings(req.body, adminId);
@@ -162,7 +162,7 @@ router.patch('/elections/:id/results', async (req: Request, res: Response, next:
  * @desc    Permanently delete an election
  * @access  Private (Admin only)
  */
-router.delete('/elections/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/elections/:id', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const adminId = (req as any).user.id;
         const result = await deleteElection(req.params.id, adminId);
@@ -250,7 +250,7 @@ router.patch('/voters/:id/status', async (req: Request, res: Response, next: Nex
  * @desc    Permanently delete a voter
  * @access  Private (Admin only)
  */
-router.delete('/voters/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/voters/:id', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const adminId = (req as any).user.id;
         const result = await deleteVoter(req.params.id, adminId);
@@ -304,7 +304,7 @@ router.patch('/candidates/:id/status', async (req: Request, res: Response, next:
  * @desc    Delete a rejected candidate
  * @access  Private (Admin only)
  */
-router.delete('/candidates/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/candidates/:id', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const adminId = (req as any).user.id;
         const result = await deleteCandidate(req.params.id, adminId);
@@ -367,15 +367,69 @@ router.get('/audit-logs/export', async (req: Request, res: Response, next: NextF
 });
 
 /**
+ * @route   GET /admin/admins
+ * @desc    List administrator accounts
+ * @access  Private (Super Admin only)
+ */
+router.get('/admins', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const result = await getAdmins();
+        res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
  * @route   POST /admin/admins
  * @desc    Create a new administrator
  * @access  Private (Admin only)
  */
-router.post('/admins', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/admins', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const adminId = (req as any).user.id;
         const result = await createAdmin(req.body, adminId);
         res.status(201).json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.patch('/admins/:id', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const adminId = (req as any).user.id;
+        const result = await updateAdminAccount(req.params.id, req.body, adminId);
+        res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.patch('/admins/:id/status', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const adminId = (req as any).user.id;
+        const result = await updateAdminStatus(req.params.id, req.body.status, adminId);
+        res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/admins/:id/reset-security', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const adminId = (req as any).user.id;
+        const result = await resetAdminSecurity(req.params.id, adminId);
+        res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.delete('/admins/:id', superAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const adminId = (req as any).user.id;
+        const result = await deleteAdminAccount(req.params.id, adminId);
+        res.json(result);
     } catch (error) {
         next(error);
     }

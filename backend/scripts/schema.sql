@@ -240,6 +240,10 @@ CREATE TABLE IF NOT EXISTS admin (
   username VARCHAR(100) NOT NULL UNIQUE,
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'admin',
+  status VARCHAR(20) DEFAULT 'ACTIVE',
+  created_by UUID REFERENCES admin(id) ON DELETE SET NULL,
+  suspended_at TIMESTAMPTZ,
   
   can_manage_elections BOOLEAN DEFAULT FALSE,
   can_manage_users BOOLEAN DEFAULT FALSE,
