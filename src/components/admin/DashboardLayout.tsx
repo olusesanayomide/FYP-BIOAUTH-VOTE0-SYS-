@@ -4,7 +4,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Vote, Users, UserCheck, Fingerprint, FileText,
-  Brain, ShieldAlert, Settings, LogOut, Bell, Search, Shield, Loader2, ChevronRight,
+  Brain, ShieldAlert, Settings, LogOut, Bell, Search, Shield, Loader2, ChevronRight, Menu, X
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Cookies from "js-cookie";
@@ -17,9 +17,8 @@ const menuItems = [
   { title: "Elections", icon: Vote, path: "/h3xG9Lz_admin/dashboard/elections" },
   { title: "Candidates", icon: Users, path: "/h3xG9Lz_admin/dashboard/candidates" },
   { title: "Voter Registry", icon: UserCheck, path: "/h3xG9Lz_admin/dashboard/voters" },
-  { title: "Biometric Logs", icon: Fingerprint, path: "/h3xG9Lz_admin/dashboard/biometrics" },
   { title: "Audit & Logs", icon: FileText, path: "/h3xG9Lz_admin/dashboard/audit" },
-  { title: "AI Insights", icon: Brain, path: "/h3xG9Lz_admin/dashboard/ai" },
+  { title: "Insights", icon: Brain, path: "/h3xG9Lz_admin/dashboard/ai" },
   { title: "Security Center", icon: ShieldAlert, path: "/h3xG9Lz_admin/dashboard/security" },
   { title: "Settings", icon: Settings, path: "/h3xG9Lz_admin/dashboard/settings" },
 ];
@@ -44,13 +43,14 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
 
   const handleLogout = () => {
     Cookies.remove("admin_token", { path: "/" });
-    router.push("/");
+    window.location.href = "/h3xG9Lz_admin";
   };
 
   const [universityName, setUniversityName] = useState("SECURE-VOTE");
   const [systemName, setSystemName] = useState("VOTING-SYSTEM");
   const [logoUrl, setLogoUrl] = useState("");
   const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -159,17 +159,22 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
   }, []);
 
   return (
-    <div className="min-h-screen flex admin-shell">
+    <div className="min-h-screen flex admin-shell overflow-x-hidden">
       <div className="absolute inset-0 grid-overlay pointer-events-none" />
 
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-[55] bg-background/80 backdrop-blur-sm md:hidden transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <motion.aside
-        className="fixed left-0 top-0 bottom-0 w-[260px] z-50 flex flex-col border-r border-border/40 bg-card/85 backdrop-blur-xl"
-        initial={{ x: -260 }}
-        animate={{ x: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
+      <aside
+        className={`fixed left-0 top-0 bottom-0 w-[260px] z-[60] flex flex-col border-r border-border/40 bg-card/95 backdrop-blur-xl transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
-        <div className="p-6 border-b border-border/30">
+        <div className="p-6 border-b border-border/30 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateTo("/h3xG9Lz_admin/dashboard")}>
             {logoUrl ? (
               <img src={logoUrl} alt="System Logo" className="w-9 h-9 rounded-lg object-contain bg-white/5" />
@@ -183,6 +188,12 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
               <p className="text-[10px] text-muted-foreground tracking-wider">{universityName}</p>
             </div>
           </div>
+          <button 
+            className="md:hidden p-1 text-muted-foreground hover:bg-muted/50 rounded-md -mr-2"
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="px-4 pt-4 pb-2">
@@ -195,7 +206,10 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
             return (
               <button
                 key={item.title}
-                onClick={() => navigateTo(item.path)}
+                onClick={() => {
+                  navigateTo(item.path);
+                  setIsSidebarOpen(false);
+                }}
                 disabled={pendingPath !== null && pendingPath !== item.path}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group relative disabled:opacity-70 disabled:cursor-wait ${active ? "bg-primary/12 border border-primary/30 text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.15)]" : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/50"
                   }`}
@@ -223,29 +237,37 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
           })}
         </nav>
 
-      </motion.aside>
+      </aside>
 
       {/* Main content */}
-      <div className="ml-[260px] flex-1 flex flex-col min-h-screen relative z-10">
+      <div className="md:ml-[260px] flex-1 flex flex-col min-h-screen relative z-10 w-full max-w-[100vw]">
         <motion.header
-          className="h-14 border-b border-border/30 bg-background/75 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-40"
+          className="h-14 border-b border-border/30 bg-background/75 backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="cursor-pointer hover:text-foreground transition-colors" onClick={() => navigateTo("/h3xG9Lz_admin/dashboard")}>Home</span>
-            <span className="text-border">/</span>
-            <span>Admin</span>
-            {breadcrumb.map((item, i) => (
-              <span key={i} className="flex items-center gap-2">
-                <span className="text-border">/</span>
-                <span className={i === breadcrumb.length - 1 ? "text-foreground" : ""}>{item}</span>
-              </span>
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden mr-1 p-1.5 -ml-1.5 rounded-md text-muted-foreground hover:bg-muted/50 transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
+              <span className="cursor-pointer hover:text-foreground transition-colors" onClick={() => navigateTo("/h3xG9Lz_admin/dashboard")}>Home</span>
+              <span className="text-border">/</span>
+              <span>Admin</span>
+              {breadcrumb.map((item, i) => (
+                <span key={i} className="flex items-center gap-2">
+                  <span className="text-border">/</span>
+                  <span className={i === breadcrumb.length - 1 ? "text-foreground" : ""} >{item}</span>
+                </span>
+              ))}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
             <button
               onClick={() => setIsSearchOpen(true)}
@@ -336,7 +358,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
                   setIsProfileOpen((prev) => !prev);
                   setIsNotifOpen(false);
                 }}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ml-2 text-primary-foreground"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold sm:ml-2 text-primary-foreground"
                 style={{ background: "linear-gradient(135deg, hsl(187, 100%, 50%), hsl(270, 91%, 65%))" }}
                 title="Account"
               >
@@ -373,8 +395,8 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
           </div>
         </motion.header>
 
-        <main className="flex-1 p-6 lg:p-10">
-          <div className="max-w-[1400px] mx-auto space-y-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-10">
+          <div className="max-w-[1400px] mx-auto space-y-6 sm:space-y-8">
             <AnimatePresence>
               {!isRegistered && !pathname?.includes('enroll') && (
                 <motion.div
@@ -440,7 +462,7 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
-              className="w-full max-w-[620px] admin-card rounded-2xl p-4"
+              className="w-full max-w-[620px] max-h-[80vh] admin-card rounded-2xl p-4 overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative">
@@ -457,10 +479,10 @@ const DashboardLayout = ({ children, breadcrumb = ["Dashboard"] }: DashboardLayo
                     }
                   }}
                   placeholder="Search pages... (Dashboard, Elections, Candidates)"
-                  className="admin-input h-12 pl-10 pr-4 text-sm"
+                  className="admin-input h-12 pl-10 pr-4 text-sm w-full"
                 />
               </div>
-              <div className="mt-3 rounded-xl border border-border/40 overflow-hidden">
+              <div className="mt-3 rounded-xl border border-border/40 overflow-y-auto flex-1 min-h-[50vh] sm:min-h-0">
                 {filteredMenuItems.length === 0 ? (
                   <p className="px-4 py-5 text-sm text-muted-foreground">No matching pages.</p>
                 ) : (

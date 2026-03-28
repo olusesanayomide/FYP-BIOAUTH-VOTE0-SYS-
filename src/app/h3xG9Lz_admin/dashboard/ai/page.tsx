@@ -56,10 +56,10 @@ const AIInsightsPage = () => {
         if (logsRes.success && logsRes.data) {
           setLogs(logsRes.data as AuditLogLike[]);
         } else if (!logsRes.success) {
-          setError(logsRes.error || "Failed to fetch AI insight telemetry.");
+          setError(logsRes.error || "Failed to fetch insight telemetry.");
         }
       } catch (e: any) {
-        setError(e?.message || "Failed to fetch AI insight telemetry.");
+        setError(e?.message || "Failed to fetch insight telemetry.");
       } finally {
         setLoading(false);
       }
@@ -151,11 +151,11 @@ const AIInsightsPage = () => {
   }, [elections, logs]);
 
   return (
-    <DashboardLayout breadcrumb={["AI Insights"]}>
+    <DashboardLayout breadcrumb={["Insights"]}>
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
         <div className="flex items-center gap-3">
           <Brain className="w-5 h-5 text-primary" />
-          <h2 className="text-xl font-semibold text-foreground">AI Insights (v1)</h2>
+          <h2 className="text-xl font-semibold text-foreground">Insights (v1)</h2>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -177,7 +177,7 @@ const AIInsightsPage = () => {
           <div className="glass-card rounded-xl p-5 xl:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-medium text-foreground">Turnout Forecast (Rule-Based)</h3>
+              <h3 className="text-sm font-medium text-foreground">Turnout Forecast</h3>
             </div>
 
             {loading ? (
@@ -279,7 +279,7 @@ const AIInsightsPage = () => {
         <div className="glass-card rounded-xl p-4 border border-warning/10">
           <p className="text-[10px] text-warning/80 flex items-center gap-2">
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-            v1 uses deterministic analytics heuristics. This is decision support, not autonomous enforcement.
+            v1 uses deterministic analytics heuristics. This is decision support 
           </p>
         </div>
       </motion.div>

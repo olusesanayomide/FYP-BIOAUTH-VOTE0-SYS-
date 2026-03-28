@@ -10,8 +10,8 @@ export async function middleware(req: NextRequest) {
 
         // As per user request: Even if someone discovers the URL, they should NOT see anything without auth.
         if (!hasAdminSession) {
-            req.nextUrl.pathname = '/404';
-            return NextResponse.rewrite(req.nextUrl);
+            req.nextUrl.pathname = '/h3xG9Lz_admin';
+            return NextResponse.redirect(req.nextUrl);
         }
     }
 
