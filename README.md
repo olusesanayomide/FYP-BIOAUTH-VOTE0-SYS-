@@ -115,48 +115,44 @@ The system follows a layered web architecture:
 - **Presentation Layer** – React frontend for voter and admin interactions
 - **Application Layer** – NestJS backend for business logic, authentication, and vote handling
 - **Data Layer** – PostgreSQL/Supabase for secure persistence and auditing
-- **Hardware-backed authentication layer** – device biometrics via WebAuthn-compatible authenticators when available fileciteturn0file0
+- **Hardware-backed authentication layer** – device biometrics via WebAuthn-compatible authenticators when available 
 
-> Add your architecture diagram here once exported from your documentation.
+ 
 
 ## Screenshots
 
-Add 2–3 clean screenshots in this section.
+**Voter Login / Biometric Prompt Flow**  
+<p align="center">
+  <img src="assets/login-UI1.png" alt="Biometric prompt screen" width="260" />
+  <span style="display:inline-block; width: 16px;"></span>
+  <img src="assets/login-UI2.png" alt="Identity verified screen" width="260" />
+</p>
 
-Recommended screenshots:
+Biometric authentication is handled at the device level via WebAuthn.
+For security reasons, the OS prevents capturing screenshots of the biometric prompt.
 
-1. **Voter Login / Biometric Prompt Flow**  
-   Show the cleanest authentication screen or login page.
+**Voting Dashboard / Ballot Page**  
+<p align="center">
+  <img src="assets/ballot-ui.png" alt="Ballot interface" width="300" />
+  <span style="display:inline-block; width: 16px;"></span>
+  <img src="assets/ballot-UI3.png" alt="Ballot selection state" width="300" />
+</p>
+Biometric authentication is handled at the device level via WebAuthn.
+For security reasons, the OS prevents capturing screenshots of the biometric prompt.
 
-2. **Voting Dashboard / Ballot Page**  
-   Show the election list or vote casting interface.
+Admin Dashboard (Web)
 
-3. **Admin Results Dashboard**  
-   Show turnout, result charts, or election management overview.
 
-Suggested folder structure:
+ <p align="center">
+  <img src="assets/dashboard-admin.png" alt="Admin dashboard" width="800" />
+</p>
+Real-time monitoring and control center for election management.
 
-```text
-assets/
-  login.png
-  ballot.png
-  dashboard.png
-```
+- Live election tracking and voter participation  
+- Biometric verification monitoring  
+- Security insights and audit logs  
 
-Then embed them like this:
 
-```md
-## Screenshots
-
-### Login
-![Login screen](assets/login.png)
-
-### Ballot Interface
-![Ballot page](assets/ballot.png)
-
-### Admin Dashboard
-![Admin dashboard](assets/dashboard.png)
-```
 
 ## Testing
 
@@ -215,17 +211,9 @@ This project is not just a voting app. It is an attempt to solve a real trust pr
 
 ## Repository Structure
 
-```text
-client/          # frontend application
-server/          # backend application
-assets/          # screenshots and diagrams
-docs/            # extra documentation if needed
-README.md
-```
+ 
 
 ## Setup
-
-> Replace the commands below with your actual repo commands.
 
 ```bash
 # clone repo
