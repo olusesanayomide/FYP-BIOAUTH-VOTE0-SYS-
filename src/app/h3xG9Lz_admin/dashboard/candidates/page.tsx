@@ -146,7 +146,7 @@ const Candidates = () => {
       const candRes = await apiClient.get('/admin/candidates');
       const candData = candRes.data;
       if (candData.success) {
-        setCandidates(candData.data.map((dbCand: any) => ({
+        const mappedCandidates = candData.data.map((dbCand: any) => ({
           id: dbCand.id,
           name: dbCand.name,
           position: dbCand.position,
@@ -167,7 +167,9 @@ const Candidates = () => {
             admin: h.admin || "System",
             note: h.note || ""
           }))
-        })));
+        }));
+
+        setCandidates(mappedCandidates);
       }
     } catch (error) {
       console.error("Failed to load candidates UI", error);

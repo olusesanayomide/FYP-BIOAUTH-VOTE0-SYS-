@@ -31,6 +31,14 @@ interface Election {
   votesCast: number;
   fraudAlerts: number;
   resultsPublished: boolean;
+  liveCandidateResults: {
+    id: string;
+    name: string;
+    position: string;
+    status: string;
+    voteCount: number;
+  }[];
+  analyticsUpdatedAt: string | null;
 }
 
 // Dynamic fetching prevents using hardcoded mocks
@@ -116,6 +124,18 @@ const Elections = () => {
     return () => window.clearTimeout(timer);
   }, [feedbackMessage]);
 
+  useEffect(() => {
+    if (view !== "detail" || !selectedElection) return;
+
+    fetchAnalytics(selectedElection.id);
+
+    const intervalId = window.setInterval(() => {
+      fetchAnalytics(selectedElection.id);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [view, selectedElection?.id]);
+
   const fetchElections = async () => {
     setIsLoadingElections(true);
     try {
@@ -162,6 +182,8 @@ const Elections = () => {
             votesCast: dbElection.votesCast || 0,
             fraudAlerts: dbElection.fraudAlerts || 0,
             resultsPublished: dbElection.results_published === true,
+            liveCandidateResults: [],
+            analyticsUpdatedAt: null,
           };
         });
         setElections(mappedData);
@@ -183,7 +205,9 @@ const Elections = () => {
           registeredVoters: data.data.registeredVoters,
           verifiedBiometric: data.data.verifiedBiometric,
           votesCast: data.data.votesCast,
-          fraudAlerts: data.data.fraudAlerts
+          fraudAlerts: data.data.fraudAlerts,
+          liveCandidateResults: data.data.liveCandidateResults || [],
+          analyticsUpdatedAt: data.data.updatedAt || null
         } : e));
 
         // Also update selectedElection if it's currently open
@@ -192,7 +216,9 @@ const Elections = () => {
           registeredVoters: data.data.registeredVoters,
           verifiedBiometric: data.data.verifiedBiometric,
           votesCast: data.data.votesCast,
-          fraudAlerts: data.data.fraudAlerts
+          fraudAlerts: data.data.fraudAlerts,
+          liveCandidateResults: data.data.liveCandidateResults || [],
+          analyticsUpdatedAt: data.data.updatedAt || null
         } : prev);
       }
     } catch (error) {
@@ -275,7 +301,6 @@ const Elections = () => {
 
   const openDetail = (el: Election) => {
     setSelectedElection(el);
-    fetchAnalytics(el.id);
     setView("detail");
   };
 
@@ -1037,6 +1062,94 @@ const Elections = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="admin-card rounded-xl p-6 mt-5">
+              <div className="flex items-start justify-between gap-4 mb-5">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-primary" /> Live Vote Casting
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    This visualization updates automatically while the election details are open.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Last Sync</p>
+                  <p className="text-xs text-foreground">
+                    {selectedElection.analyticsUpdatedAt ? new Date(selectedElection.analyticsUpdatedAt).toLocaleTimeString() : "Waiting..."}
+                  </p>
+                </div>
+              </div>
+
+              {selectedElection.liveCandidateResults.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/40 bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                  No live candidate vote data is available for this election yet.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Array.from(new Set(selectedElection.liveCandidateResults.map((candidate) => candidate.position))).map((position) => {
+                    const positionCandidates = selectedElection.liveCandidateResults
+                      .filter((candidate) => candidate.position === position)
+                      .sort((a, b) => b.voteCount - a.voteCount || a.name.localeCompare(b.name));
+                    const positionTotal = positionCandidates.reduce((sum, candidate) => sum + candidate.voteCount, 0);
+                    const leadingVoteCount = positionCandidates[0]?.voteCount || 0;
+
+                    return (
+                      <div key={position} className="rounded-xl border border-border/30 bg-muted/10 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-foreground">{position}</h4>
+                          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                            {positionTotal.toLocaleString()} position votes
+                          </span>
+                        </div>
+
+                        <div className="space-y-3">
+                          {positionCandidates.map((candidate, index) => {
+                            const percentage = positionTotal > 0 ? Math.round((candidate.voteCount / positionTotal) * 100) : 0;
+                            const width = positionTotal > 0 ? Math.max((candidate.voteCount / positionTotal) * 100, candidate.voteCount > 0 ? 6 : 0) : 0;
+                            const isLeader = leadingVoteCount > 0 && candidate.voteCount === leadingVoteCount;
+
+                            return (
+                              <div
+                                key={candidate.id}
+                                className={`rounded-lg px-3 py-3 transition-colors ${isLeader ? "bg-primary/5 border border-primary/20" : ""}`}
+                              >
+                                <div className="flex items-center justify-between gap-3 mb-1">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm text-foreground">{candidate.name}</p>
+                                      {isLeader && (
+                                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-primary">
+                                          Leading
+                                        </span>
+                                      )}
+                                      <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                                        #{index + 1}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{candidate.status}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-semibold text-foreground">{candidate.voteCount.toLocaleString()}</p>
+                                    <p className="text-[10px] text-muted-foreground">{percentage}% of this position</p>
+                                  </div>
+                                </div>
+                                <div className="h-2.5 rounded-full bg-muted/30 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-primary transition-all duration-500"
+                                    style={{ width: `${Math.min(width, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </motion.div>
         )}

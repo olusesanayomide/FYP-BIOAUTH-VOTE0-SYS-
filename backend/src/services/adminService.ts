@@ -353,6 +353,32 @@ export const getAllCandidates = async () => {
 
         if (error) throw error;
 
+        const electionIds = Array.from(new Set((data || []).map((cand: any) => cand.election_id).filter(Boolean)));
+        const voteCountByCandidate = new Map<string, number>();
+        const totalVotesByElection = new Map<string, number>();
+
+        if (electionIds.length > 0) {
+            const { data: voteRows, error: voteError } = await supabase
+                .from('votes')
+                .select('election_id, selected_candidate_id')
+                .in('election_id', electionIds);
+
+            if (voteError) throw voteError;
+
+            for (const row of (voteRows || [])) {
+                const candidateId = (row as any).selected_candidate_id;
+                const electionId = (row as any).election_id;
+
+                if (candidateId) {
+                    voteCountByCandidate.set(candidateId, (voteCountByCandidate.get(candidateId) || 0) + 1);
+                }
+
+                if (electionId) {
+                    totalVotesByElection.set(electionId, (totalVotesByElection.get(electionId) || 0) + 1);
+                }
+            }
+        }
+
         const candidateIds = (data || []).map((cand: any) => cand.id);
         let approvalHistoryByCandidate = new Map<string, any[]>();
 
@@ -409,7 +435,9 @@ export const getAllCandidates = async () => {
         const normalized = (data || []).map((cand: any) => ({
             ...cand,
             election_name: cand?.elections?.title || 'Unknown Election',
-            approval_history: approvalHistoryByCandidate.get(cand.id) || []
+            approval_history: approvalHistoryByCandidate.get(cand.id) || [],
+            live_vote_count: voteCountByCandidate.get(cand.id) || 0,
+            live_election_vote_total: totalVotesByElection.get(cand.election_id) || 0
         }));
 
         return {
@@ -621,17 +649,19 @@ export const createCandidate = async (candidateData: any, adminId: string) => {
         // Auto-lookup the student's real faculty, department and level from their registered user profile
         const { data: studentInfo } = await supabase
             .from('users')
-            .select('faculty, department, level')
+            .select('id, faculty, department, level')
             .eq('matric_no', studentId)
             .single();
 
         const faculty = studentInfo?.faculty || manualFaculty || 'Unknown';
         const department = studentInfo?.department || manualDepartment || 'Unknown';
         const level = studentInfo?.level || manualLevel || 'Unknown';
+        const linkedUserId = studentInfo?.id || null;
 
         const { data, error } = await supabase
             .from('candidates')
             .insert([{
+                user_id: linkedUserId,
                 name,
                 position,
                 student_id: studentId,
@@ -724,17 +754,19 @@ export const updateCandidate = async (id: string, candidateData: any, adminId: s
 
         const { data: studentInfo } = await supabase
             .from('users')
-            .select('faculty, department, level')
+            .select('id, faculty, department, level')
             .eq('matric_no', studentId)
             .single();
 
         const faculty = studentInfo?.faculty || manualFaculty || 'Unknown';
         const department = studentInfo?.department || manualDepartment || 'Unknown';
         const level = studentInfo?.level || manualLevel || 'Unknown';
+        const linkedUserId = studentInfo?.id || null;
 
         const { data, error } = await supabase
             .from('candidates')
             .update({
+                user_id: linkedUserId,
                 name,
                 position,
                 student_id: studentId,
@@ -1343,7 +1375,7 @@ export const getElectionAnalytics = async (id: string) => {
         // 3. Aggregate Vote Casting numbers
         const { data: voteRows, error: votesError } = await supabase
             .from('votes')
-            .select('voter_id')
+            .select('voter_id, selected_candidate_id')
             .eq('election_id', id);
 
         if (votesError) throw votesError;
@@ -1352,13 +1384,64 @@ export const getElectionAnalytics = async (id: string) => {
         const uniqueVoters = new Set((voteRows || []).map(r => r.voter_id));
         const votesCast = uniqueVoters.size;
 
+        const { data: candidates, error: candidatesError } = await supabase
+            .from('candidates')
+            .select('id, user_id, student_id, name, position, status')
+            .eq('election_id', id)
+            .neq('status', 'rejected')
+            .order('position', { ascending: true })
+            .order('name', { ascending: true });
+
+        if (candidatesError) throw candidatesError;
+
+        const matricNumbers = Array.from(new Set((candidates || []).map((candidate: any) => candidate.student_id).filter(Boolean)));
+        const derivedUserIdByMatric = new Map<string, string>();
+
+        if (matricNumbers.length > 0) {
+            const { data: linkedUsers, error: linkedUsersError } = await supabase
+                .from('users')
+                .select('id, matric_no')
+                .in('matric_no', matricNumbers);
+
+            if (linkedUsersError) throw linkedUsersError;
+
+            for (const user of (linkedUsers || [])) {
+                if ((user as any).matric_no) {
+                    derivedUserIdByMatric.set((user as any).matric_no, (user as any).id);
+                }
+            }
+        }
+
+        const candidateVoteCount = new Map<string, number>();
+        for (const row of (voteRows || [])) {
+            const candidateId = (row as any).selected_candidate_id;
+            if (candidateId) {
+                candidateVoteCount.set(candidateId, (candidateVoteCount.get(candidateId) || 0) + 1);
+            }
+        }
+
+        const liveCandidateResults = (candidates || []).map((candidate: any) => ({
+            id: candidate.id,
+            name: candidate.name,
+            position: candidate.position || 'General',
+            status: candidate.status,
+            voteCount:
+                (candidateVoteCount.get(candidate.id) || 0) +
+                (candidate.user_id ? (candidateVoteCount.get(candidate.user_id) || 0) : 0) +
+                ((candidate.student_id && derivedUserIdByMatric.has(candidate.student_id))
+                    ? (candidateVoteCount.get(derivedUserIdByMatric.get(candidate.student_id) as string) || 0)
+                    : 0)
+        }));
+
         return {
             success: true,
             data: {
                 registeredVoters: totalRegistered,
                 verifiedBiometric: totalVerified,
                 votesCast: votesCast,
-                fraudAlerts: 0  // Fallback until advanced fraud logic is implemented
+                fraudAlerts: 0,  // Fallback until advanced fraud logic is implemented
+                liveCandidateResults,
+                updatedAt: new Date().toISOString()
             }
         };
 

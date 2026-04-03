@@ -630,6 +630,8 @@ export const getVotingResults = async (electionId: string) => {
       *,
       candidates (
         id,
+        user_id,
+        student_id,
         name,
         position
       ),
@@ -653,6 +655,26 @@ export const getVotingResults = async (electionId: string) => {
     throw new ApiError(403, 'Results are not available yet. The electoral committee has not officially published the final tallies.', 'RESULTS_NOT_PUBLISHED');
   }
 
+  const matricNumbers = Array.from(new Set((election.candidates || []).map((candidate: any) => candidate.student_id).filter(Boolean)));
+  const derivedUserIdByMatric = new Map<string, string>();
+
+  if (matricNumbers.length > 0) {
+    const { data: linkedUsers, error: linkedUsersError } = await supabase
+      .from('users')
+      .select('id, matric_no')
+      .in('matric_no', matricNumbers);
+
+    if (linkedUsersError) {
+      throw new ApiError(500, 'Failed to resolve candidate vote mappings', 'FETCH_FAILED');
+    }
+
+    for (const user of (linkedUsers || [])) {
+      if ((user as any).matric_no) {
+        derivedUserIdByMatric.set((user as any).matric_no, (user as any).id);
+      }
+    }
+  }
+
   const positionsMap = new Map();
   (election.candidates || []).forEach((c: any) => {
     const posName = c.position || 'General';
@@ -663,7 +685,13 @@ export const getVotingResults = async (electionId: string) => {
         candidates: []
       });
     }
-    const voteCount = (election.votes || []).filter((v: any) => v.selected_candidate_id === c.id).length;
+    const possibleIds = new Set<string>([c.id]);
+    if (c.user_id) possibleIds.add(c.user_id);
+    if (c.student_id && derivedUserIdByMatric.has(c.student_id)) {
+      possibleIds.add(derivedUserIdByMatric.get(c.student_id)!);
+    }
+
+    const voteCount = (election.votes || []).filter((v: any) => possibleIds.has(v.selected_candidate_id)).length;
     positionsMap.get(posName).candidates.push({
       candidateId: c.id,
       candidateName: c.name,
